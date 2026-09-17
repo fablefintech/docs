@@ -1,7 +1,7 @@
 ---
-title: "POST /compliance/aml — Run AML Screening"
+title: "POST /compliance/aml — Anti-Money Laundering Screening"
 sidebarTitle: "AML Screening"
-description: "POST /compliance/aml — screens a customer or transaction against AML databases and returns a risk assessment."
+description: "Screen a customer against AML watchlists and PEP databases using POST /compliance/aml. Returns a risk score, match details, and a CLEAR or FLAGGED status."
 ---
 
 Screen a customer or transaction against AML (Anti-Money Laundering) databases before processing a remittance. The screening evaluates the provided information against watchlists, politically exposed persons (PEP) databases, and adverse media sources, returning a risk score and match details. You can run AML screening independently or as part of your transaction compliance flow.

@@ -1,5 +1,5 @@
 ---
-title: "BizPay: Cross-Border Business Payments for SMEs"
+title: "BizPay: Cross-Border Payment Solutions for Bank SME Clients"
 sidebarTitle: "BizPay"
 description: "BizPay lets banks offer SMEs a complete cross-border payment solution — multi-corridor payables and receivables with invoicing and self-onboarding."
 ---
@@ -28,12 +28,16 @@ Your SME customers don't need to build complex treasury functions or maintain re
 BizPay connects to your bank's existing core banking system through a set of plug-and-play REST APIs. There is no need to replace or significantly modify your core infrastructure — BizPay layers on top of what you already have.
 
 ```http
-POST /v1/bizpay/payments
+POST https://api-sandbox.fablefintech.com/v1/transactions
 Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "sender_account": "ACC-SME-001",
+  "type": "outward",
+  "sender": {
+    "account_id": "ACC-SME-001",
+    "name": "Acme Trading LLC"
+  },
   "beneficiary": {
     "name": "Nguyen Exports Ltd",
     "bank_code": "VCB",
@@ -41,9 +45,17 @@ Content-Type: application/json
     "country": "VN"
   },
   "amount": 15000.00,
-  "currency": "USD",
+  "source_currency": "USD",
+  "destination_currency": "VND",
   "purpose": "Trade Invoice #INV-2025-0042"
 }
+```
+
+Track the payment status in real time:
+
+```http
+GET https://api-sandbox.fablefintech.com/v1/transactions/{id}/status
+Authorization: Bearer <token>
 ```
 
 ## Next Steps

@@ -1,7 +1,7 @@
 ---
-title: "POST /fx/deals — Book an FX Deal"
+title: "POST /fx/deals — Book a Locked FX Deal at Current Rate"
 sidebarTitle: "Book Deal"
-description: "POST /fx/deals — books an FX deal at the current rate for a customer. Returns a deal_id for use in transactions or utilization."
+description: "POST /fx/deals books a locked FX deal for a customer. Provide a rate_id, currency pair, amount, and customer_id. Returns a deal_id and BOOKED status."
 ---
 
 Book a locked FX deal for a customer using a valid `rate_id` obtained from `GET /fx/rates`. Booking a deal reserves the quoted rate for the specified amount and customer, giving you a guaranteed conversion before the underlying funds transfer takes place. Once the associated funds transfer is confirmed, mark the deal as utilized using `POST /fx/deals/{deal_id}/utilize`.

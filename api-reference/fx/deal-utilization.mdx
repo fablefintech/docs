@@ -1,7 +1,7 @@
 ---
-title: "POST /fx/deals/{id}/utilize — Utilize an FX Deal"
+title: "POST /fx/deals/{id}/utilize — Mark an FX Deal as Used"
 sidebarTitle: "Deal Utilization"
-description: "POST /fx/deals/{id}/utilize — marks a booked FX deal as utilized after the associated funds transfer has been confirmed."
+description: "Use POST /fx/deals/{id}/utilize to mark a booked FX deal as utilized once the funds transfer is confirmed. Links the deal to a specific transaction record."
 ---
 
 Mark a previously booked FX deal as utilized once the underlying funds transfer is complete. Utilization confirms that the locked rate has been consumed and associates the deal with the corresponding transaction. Each deal can only be utilized once — attempting to utilize a deal a second time returns `DEAL_ALREADY_UTILIZED`.

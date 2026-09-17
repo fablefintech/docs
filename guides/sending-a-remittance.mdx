@@ -1,5 +1,5 @@
 ---
-title: "Send a Cross-Border Remittance Using DigiRemit"
+title: "Send a Cross-Border Remittance Using DigiRemit API"
 sidebarTitle: "Send Remittance"
 description: "Step-by-step guide to creating an outward remittance transaction with DigiRemit — from fetching an FX rate to confirming delivery."
 ---
@@ -13,7 +13,7 @@ This guide walks you through a complete outward remittance flow using DigiRemit 
     ```bash
     curl --request GET \
       --url "https://api-sandbox.fablefintech.com/v1/fx/rates?from=USD&to=INR" \
-      --header "Authorization: Bearer <your_api_key>"
+      --header "Authorization: Bearer $FABLE_API_KEY"
     ```
 
     **Response:**
@@ -38,7 +38,7 @@ This guide walks you through a complete outward remittance flow using DigiRemit 
     ```bash
     curl --request POST \
       --url "https://api-sandbox.fablefintech.com/v1/compliance/kyc" \
-      --header "Authorization: Bearer <your_api_key>" \
+      --header "Authorization: Bearer $FABLE_API_KEY" \
       --header "Content-Type: application/json" \
       --data '{
         "customer_id": "CUST-001",
@@ -59,7 +59,7 @@ This guide walks you through a complete outward remittance flow using DigiRemit 
     ```bash
     curl --request POST \
       --url "https://api-sandbox.fablefintech.com/v1/transactions" \
-      --header "Authorization: Bearer <your_api_key>" \
+      --header "Authorization: Bearer $FABLE_API_KEY" \
       --header "Content-Type: application/json" \
       --data '{
         "sender": {
@@ -113,7 +113,7 @@ This guide walks you through a complete outward remittance flow using DigiRemit 
     ```bash
     curl --request GET \
       --url "https://api-sandbox.fablefintech.com/v1/transactions/TXN-20240115-ABC123/status" \
-      --header "Authorization: Bearer <your_api_key>"
+      --header "Authorization: Bearer $FABLE_API_KEY"
     ```
 
     **Response:**
@@ -143,7 +143,7 @@ This guide walks you through a complete outward remittance flow using DigiRemit 
     ```bash
     curl --request GET \
       --url "https://api-sandbox.fablefintech.com/v1/transactions/TXN-20240115-ABC123/status" \
-      --header "Authorization: Bearer <your_api_key>"
+      --header "Authorization: Bearer $FABLE_API_KEY"
     ```
 
     **Failed transaction response:**
@@ -172,6 +172,54 @@ This guide walks you through a complete outward remittance flow using DigiRemit 
 ## Code Examples
 
 <CodeGroup>
+
+```bash curl
+# Step 1: Fetch FX rate
+curl --request GET \
+  --url "https://api-sandbox.fablefintech.com/v1/fx/rates?from=USD&to=INR" \
+  --header "Authorization: Bearer $FABLE_API_KEY"
+
+# Step 2: KYC verification
+curl --request POST \
+  --url "https://api-sandbox.fablefintech.com/v1/compliance/kyc" \
+  --header "Authorization: Bearer $FABLE_API_KEY" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "customer_id": "CUST-001",
+    "full_name": "Jane Doe",
+    "date_of_birth": "1990-04-15",
+    "id_type": "PASSPORT",
+    "id_number": "X12345678",
+    "nationality": "US"
+  }'
+
+# Step 3: Create transaction (replace RATE-20240115-XYZ789 with the rate_id from Step 1)
+curl --request POST \
+  --url "https://api-sandbox.fablefintech.com/v1/transactions" \
+  --header "Authorization: Bearer $FABLE_API_KEY" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "sender": {
+      "customer_id": "CUST-001",
+      "full_name": "Jane Doe",
+      "country": "US"
+    },
+    "receiver": {
+      "full_name": "Ravi Kumar",
+      "account_number": "9876543210",
+      "bank_code": "SBIN0001234",
+      "country": "IN"
+    },
+    "amount": 500.00,
+    "source_currency": "USD",
+    "destination_currency": "INR",
+    "corridor": "US-IN",
+    "channel": "BANK_TRANSFER",
+    "rate_id": "RATE-20240115-XYZ789",
+    "reference": "REF-2024-00123",
+    "purpose": "FAMILY_SUPPORT"
+  }'
+```
 
 ```javascript JavaScript
 const axios = require('axios');

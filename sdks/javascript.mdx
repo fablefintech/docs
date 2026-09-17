@@ -1,5 +1,5 @@
 ---
-title: "JavaScript & TypeScript SDK for Fable Fintech"
+title: "JavaScript and TypeScript SDK for Fable Fintech Payments"
 sidebarTitle: "JavaScript"
 description: "Install and use the Fable Fintech JavaScript SDK to create transactions, fetch FX rates, and run compliance checks in Node.js or browser environments."
 ---
@@ -160,7 +160,7 @@ console.log(amlResult.risk_level); // LOW | MEDIUM | HIGH
 ```typescript
 const webhook = await fable.webhooks.register({
   url: 'https://your-app.com/webhooks/fable',
-  events: ['transaction.completed', 'transaction.failed', 'kyc.status_changed'],
+  events: ['transaction.status_changed', 'transaction.failed', 'compliance.kyc_completed'],
   secret: process.env.WEBHOOK_SECRET,
 });
 console.log(webhook.webhook_id, webhook.status);

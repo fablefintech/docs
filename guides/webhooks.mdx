@@ -1,5 +1,5 @@
 ---
-title: "Configure and Handle Fable Fintech Webhooks"
+title: "Receive and Verify Webhook Events from Fable Fintech"
 sidebarTitle: "Webhooks"
 description: "Set up webhooks to receive real-time transaction status updates and compliance events from Fable Fintech instead of polling the API."
 ---
@@ -13,7 +13,7 @@ Call `POST /webhooks` with the URL of your receiving endpoint, the list of event
 ```bash
 curl --request POST \
   --url "https://api-sandbox.fablefintech.com/v1/webhooks" \
-  --header "Authorization: Bearer <your_api_key>" \
+  --header "Authorization: Bearer $FABLE_API_KEY" \
   --header "Content-Type: application/json" \
   --data '{
     "url": "https://your-platform.com/webhooks/fable",
@@ -34,7 +34,7 @@ curl --request POST \
 }
 ```
 
-You can register multiple webhooks with different URLs and event subscriptions — for example, routing compliance events to a separate internal service from transaction events.
+You can register multiple webhooks with different URLs and event subscriptions — for example, routing compliance events to a separate endpoint from transaction events.
 
 ## Event Types
 
@@ -136,7 +136,7 @@ Use `crypto.timingSafeEqual` (or its equivalent in your language) rather than a 
   </Step>
 
   <Step title="Process the Event Asynchronously">
-    After returning `200`, process the event outside the HTTP request cycle. Push the raw payload onto an internal queue (such as Redis, AWS SQS, or RabbitMQ) and have a separate worker consume and process events. This decouples event ingestion from processing, ensuring that slow downstream operations (database writes, third-party API calls) do not affect your webhook response time.
+    After returning `200`, process the event outside the HTTP request cycle. Push the raw payload onto a queue (such as Redis, AWS SQS, or RabbitMQ) and have a separate worker consume and process events. This decouples event ingestion from processing, ensuring that slow downstream operations (database writes, third-party API calls) do not affect your webhook response time.
 
     <Tip>
       Using a durable queue (e.g., Redis Streams, AWS SQS) means events are not lost if your processing worker is temporarily unavailable. Events remain in the queue until they are successfully consumed and acknowledged.

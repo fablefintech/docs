@@ -1,5 +1,5 @@
 ---
-title: "Python SDK for Fable Fintech"
+title: "Python SDK for Fable Fintech Cross-Border Payments"
 sidebarTitle: "Python"
 description: "Install and use the Fable Fintech Python SDK to integrate cross-border remittance, FX rates, and compliance checks into your Python application."
 ---
@@ -150,7 +150,7 @@ print(f"AML risk level: {aml_result.risk_level}")
 ```python
 webhook = client.webhooks.register(
     url="https://your-app.com/webhooks/fable",
-    events=["transaction.completed", "transaction.failed", "kyc.status_changed"],
+    events=["transaction.status_changed", "transaction.failed", "compliance.kyc_completed"],
     secret="your_webhook_signing_secret",
 )
 print(webhook.webhook_id, webhook.status)

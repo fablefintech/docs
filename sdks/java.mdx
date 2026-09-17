@@ -1,5 +1,5 @@
 ---
-title: "Java SDK for Fable Fintech"
+title: "Java SDK for Fable Fintech: Maven, Gradle, and Builder API"
 sidebarTitle: "Java"
 description: "Use the Fable Fintech Java SDK with Maven or Gradle to integrate remittance transactions, FX deals, and compliance into your JVM application."
 ---
@@ -190,7 +190,7 @@ import java.util.List;
 
 RegisterWebhookRequest webhookRequest = RegisterWebhookRequest.builder()
     .url("https://your-app.com/webhooks/fable")
-    .events(List.of("transaction.completed", "transaction.failed", "kyc.status_changed"))
+    .events(List.of("transaction.status_changed", "transaction.failed", "compliance.kyc_completed"))
     .secret(System.getenv("WEBHOOK_SECRET"))
     .build();
 

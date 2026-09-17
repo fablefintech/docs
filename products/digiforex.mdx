@@ -1,5 +1,5 @@
 ---
-title: "DigiForex: High-Volume Bulk Outbound Remittance"
+title: "DigiForex: Bulk Outbound Remittance Processing at Scale"
 sidebarTitle: "DigiForex"
 description: "DigiForex enables banks to process high-volume bulk outbound remittances across corridors, currencies, and delivery channels at scale."
 ---
@@ -21,18 +21,38 @@ A bank receives a bulk payment file from a corporate client needing to disburse 
 
 ## API Integration
 
-DigiForex exposes bulk upload endpoints that accept standard payment file formats, making it straightforward to connect your corporate banking portal or partner onboarding flow.
+DigiForex integrates with the Fable Fintech public API, making it straightforward to connect your corporate banking portal or partner onboarding flow. Each payment in a batch is created as a transaction via the standard transactions endpoint.
 
 ```http
-POST /v1/digiforex/bulk-upload
-Content-Type: multipart/form-data
+POST https://api-sandbox.fablefintech.com/v1/transactions
+Authorization: Bearer <token>
+Content-Type: application/json
 
 {
+  "type": "outward",
   "batch_reference": "CORP-BATCH-20250601",
-  "file": "<payment_file>",
-  "currency_pairs": ["AED-INR", "AED-PHP", "AED-GBP"],
-  "notify_on_completion": true
+  "sender": {
+    "account_id": "ACC-CORP-001",
+    "name": "Acme Corp"
+  },
+  "beneficiary": {
+    "name": "Juan dela Cruz",
+    "bank_code": "BDO",
+    "account_number": "9876543210",
+    "country": "PH"
+  },
+  "amount": 2500.00,
+  "source_currency": "AED",
+  "destination_currency": "PHP",
+  "purpose": "Salary Disbursement - May 2025"
 }
+```
+
+Retrieve the status of any transaction in a batch using:
+
+```http
+GET https://api-sandbox.fablefintech.com/v1/transactions/{id}/status
+Authorization: Bearer <token>
 ```
 
 <Note>

@@ -1,7 +1,7 @@
 ---
-title: "Book and Utilize FX Deals with DigiBureau"
+title: "Book and Utilize FX Deals Using the DigiBureau API"
 sidebarTitle: "FX Deal Booking"
-description: "Learn how to book FX deals, lock exchange rates, and mark deals as utilized using DigiBureau's deal management API."
+description: "Use DigiBureau to fetch live FX rates, book locked-rate deals for your customers, and mark deals as utilized after payment execution."
 ---
 
 DigiBureau enables banks and financial institutions to offer locked FX rates for cross-border transactions — customers book a deal at the current market rate and utilize it when the corresponding funds transfer is executed. This decoupling of rate locking from payment execution gives your customers certainty over the exchange rate they will receive, and gives your operations team time to process the underlying transfer. This guide walks you through the complete deal lifecycle from fetching a live rate to marking a deal as utilized.
@@ -13,7 +13,7 @@ DigiBureau enables banks and financial institutions to offer locked FX rates for
     ```bash
     curl --request GET \
       --url "https://api-sandbox.fablefintech.com/v1/fx/rates?from=USD&to=INR" \
-      --header "Authorization: Bearer <your_api_key>"
+      --header "Authorization: Bearer $FABLE_API_KEY"
     ```
 
     **Response:**
@@ -38,7 +38,7 @@ DigiBureau enables banks and financial institutions to offer locked FX rates for
     ```bash
     curl --request POST \
       --url "https://api-sandbox.fablefintech.com/v1/fx/deals" \
-      --header "Authorization: Bearer <your_api_key>" \
+      --header "Authorization: Bearer $FABLE_API_KEY" \
       --header "Content-Type: application/json" \
       --data '{
         "rate_id": "RATE-20240115-XYZ789",
@@ -92,7 +92,7 @@ DigiBureau enables banks and financial institutions to offer locked FX rates for
     ```bash
     curl --request POST \
       --url "https://api-sandbox.fablefintech.com/v1/transactions" \
-      --header "Authorization: Bearer <your_api_key>" \
+      --header "Authorization: Bearer $FABLE_API_KEY" \
       --header "Content-Type: application/json" \
       --data '{
         "sender": {
@@ -125,7 +125,7 @@ DigiBureau enables banks and financial institutions to offer locked FX rates for
     ```bash
     curl --request POST \
       --url "https://api-sandbox.fablefintech.com/v1/fx/deals/DEAL-20240115-DEF456/utilize" \
-      --header "Authorization: Bearer <your_api_key>" \
+      --header "Authorization: Bearer $FABLE_API_KEY" \
       --header "Content-Type: application/json" \
       --data '{
         "transaction_id": "TXN-20240115-ABC123",

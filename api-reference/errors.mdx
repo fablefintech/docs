@@ -1,7 +1,7 @@
 ---
-title: "API Error Codes and Responses"
+title: "API Error Codes – HTTP Status and App Error Reference"
 sidebarTitle: "Errors"
-description: "Reference for all Fable Fintech API error codes, HTTP status codes, and guidance on handling each error type in your integration."
+description: "Complete reference for Fable Fintech HTTP status codes and application error codes, with retry guidance for every failure scenario."
 ---
 
 Fable uses standard HTTP status codes to communicate the outcome of every request and returns a structured error object in the response body whenever a request fails. Your integration should branch on the HTTP status code first, then inspect `error.code` for precise programmatic handling.

@@ -1,7 +1,7 @@
 ---
 title: "POST /transactions — Create Remittance Transaction"
 sidebarTitle: "Create Transaction"
-description: "POST /transactions — initiates a new remittance transaction. Requires sender, receiver, amount, corridor, and channel. Returns transaction_id and initial status."
+description: "Use POST /transactions to create a remittance. Pass sender, receiver, amount, corridor, and channel to receive a transaction_id and initial PENDING status."
 ---
 
 Use this endpoint to initiate a new cross-border remittance transaction. You must supply sender and receiver details, the amount and currencies, the corridor, and the delivery channel. Optionally, you can lock in an exchange rate by passing a `rate_id` obtained from `GET /fx/rates`. On success, the API returns a `transaction_id` and an initial status of `PENDING`.

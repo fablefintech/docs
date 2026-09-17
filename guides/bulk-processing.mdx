@@ -1,10 +1,14 @@
 ---
-title: "Process Bulk Remittances with DigiForex"
+title: "Batch Processing Outbound Remittances with DigiForex"
 sidebarTitle: "Bulk Processing"
 description: "Learn how to upload and process bulk outbound remittance files using DigiForex — handling thousands of transactions in a single API call."
 ---
 
 DigiForex is designed for banks and corporates that need to process hundreds or thousands of payments simultaneously — for salary disbursements, partner payouts, or bulk international transfers. Rather than creating transactions one by one, you submit an entire batch in a single API call, and DigiForex handles rate locking, compliance screening, and delivery routing for every item in the batch. This guide walks you through the complete bulk processing workflow from file preparation to reconciliation.
+
+<Note>
+  The bulk endpoints (`POST /transactions/bulk`, `GET /transactions/bulk/{batch_id}`, and `GET /transactions/bulk/{batch_id}/summary`) are DigiForex-specific extensions of the Fable API. They are available to all DigiForex-enabled accounts and follow the same authentication and base URL conventions as the core API.
+</Note>
 
 <Steps>
   <Step title="Prepare Your Bulk File">
@@ -53,7 +57,7 @@ DigiForex is designed for banks and corporates that need to process hundreds or 
     ```bash
     curl --request POST \
       --url "https://api-sandbox.fablefintech.com/v1/transactions/bulk" \
-      --header "Authorization: Bearer <your_api_key>" \
+      --header "Authorization: Bearer $FABLE_API_KEY" \
       --header "Content-Type: application/json" \
       --data '{
         "batch_id": "BATCH-20240115-001",
@@ -108,7 +112,7 @@ DigiForex is designed for banks and corporates that need to process hundreds or 
     ```bash
     curl --request GET \
       --url "https://api-sandbox.fablefintech.com/v1/transactions/bulk/BATCH-20240115-001" \
-      --header "Authorization: Bearer <your_api_key>"
+      --header "Authorization: Bearer $FABLE_API_KEY"
     ```
 
     **Response:**
@@ -148,7 +152,7 @@ DigiForex is designed for banks and corporates that need to process hundreds or 
     ```bash
     curl --request GET \
       --url "https://api-sandbox.fablefintech.com/v1/transactions/bulk/BATCH-20240115-001?status=FAILED" \
-      --header "Authorization: Bearer <your_api_key>"
+      --header "Authorization: Bearer $FABLE_API_KEY"
     ```
 
     **Handling by failure reason:**
@@ -169,7 +173,7 @@ DigiForex is designed for banks and corporates that need to process hundreds or 
     ```bash
     curl --request GET \
       --url "https://api-sandbox.fablefintech.com/v1/transactions/bulk/BATCH-20240115-001/summary" \
-      --header "Authorization: Bearer <your_api_key>"
+      --header "Authorization: Bearer $FABLE_API_KEY"
     ```
 
     **Response:**

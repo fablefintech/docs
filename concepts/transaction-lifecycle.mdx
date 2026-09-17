@@ -43,7 +43,7 @@ Understanding the transaction lifecycle helps you build better integrations, han
 
     For the vast majority of transactions, this stage completes within a few seconds and the transaction advances automatically. You do not need to take any action during screening unless a manual review is triggered.
 
-    If the screening engine flags the transaction — due to a sanctions match, an AML risk indicator, or a compliance rule breach — the status will move to `AWAITING_REVIEW` rather than advancing to the next stage. Your compliance team will be notified to review the flag.
+    If the screening engine flags the transaction — due to a sanctions match, an AML risk indicator, or a compliance rule breach — the transaction is held for manual review rather than advancing to the next stage. Your compliance team will be notified to review the flag and either clear or reject the transaction.
   </Step>
 
   <Step title="Approval (If Required)">
@@ -51,7 +51,7 @@ Understanding the transaction lifecycle helps you build better integrations, han
 
     **Status:** `AWAITING_APPROVAL`
 
-    Each approver receives a notification and can review and act on the transaction through the Fable dashboard or via the `/transactions/{id}/approve` API endpoint. The transaction will remain in this state until all required approvals are collected.
+    Each approver receives a notification and can review and act on the transaction through the Fable dashboard. The transaction will remain in this state until all required approvals are collected.
 
     If your integration does not have approval workflows configured, or if the transaction does not meet the threshold that triggers approval, this stage is skipped automatically.
   </Step>
@@ -69,7 +69,7 @@ Understanding the transaction lifecycle helps you build better integrations, han
 
     **Status:** `IN_TRANSIT`
 
-    The time spent in this state varies by corridor and channel. Real-time rails such as UPI typically settle in seconds; bank transfers in some corridors may take one to two business days. Fable provides estimated delivery times per corridor and channel via the `/corridors/{corridor}/sla` endpoint.
+    The time spent in this state varies by corridor and channel. Real-time rails such as UPI typically settle in seconds; bank transfers in some corridors may take one to two business days. Contact your Fable account team or refer to your integration documentation for estimated delivery times by corridor and channel.
   </Step>
 
   <Step title="Delivered">
@@ -85,7 +85,7 @@ Understanding the transaction lifecycle helps you build better integrations, han
 
     **Status:** `SETTLED`
 
-    This is a terminal state. The transaction is fully complete, reconciled, and recorded in your settlement report. Settled transactions appear in your daily settlement file, available via the `/reports/settlement` endpoint or the Fable dashboard.
+    This is a terminal state. The transaction is fully complete, reconciled, and recorded in your settlement report. Settled transactions appear in your daily settlement file, which you can access through the Fable dashboard.
   </Step>
 </Steps>
 
@@ -115,13 +115,12 @@ When a transaction fails, the `failure_reason` field in the transaction record c
 
 A transaction can be cancelled by your system or by the sender before it has entered the `PROCESSING` stage. Once processing begins, cancellation is no longer possible.
 
-To cancel a transaction, issue a `DELETE` or `POST` to the `/transactions/{id}/cancel` endpoint while the transaction is still in `PENDING`, `SCREENING`, or `AWAITING_APPROVAL` status.
+To cancel a transaction, send a `DELETE` request to the `/transactions/{id}` endpoint while the transaction is still in `PENDING`, `SCREENING`, or `AWAITING_APPROVAL` status.
 
 ```bash
-curl -X POST \
+curl -X DELETE \
   -H "Authorization: Bearer $FABLE_API_KEY" \
-  -H "Content-Type: application/json" \
-  https://api.fablefintech.com/v1/transactions/TXN-20240115-ABC123/cancel
+  https://api-sandbox.fablefintech.com/v1/transactions/TXN-20240115-ABC123
 ```
 
 ## Status Polling
@@ -133,17 +132,13 @@ curl -H "Authorization: Bearer $FABLE_API_KEY" \
   https://api.fablefintech.com/v1/transactions/TXN-20240115-ABC123/status
 ```
 
-The response returns the current status along with relevant timestamps:
+The response returns the transaction ID, its current status, and the timestamp of the most recent status change:
 
 ```json
 {
   "transaction_id": "TXN-20240115-ABC123",
   "status": "IN_TRANSIT",
-  "created_at": "2024-01-15T10:34:00Z",
-  "screening_completed_at": "2024-01-15T10:34:03Z",
-  "processing_started_at": "2024-01-15T10:34:10Z",
-  "dispatched_at": "2024-01-15T10:34:22Z",
-  "estimated_delivery": "2024-01-15T10:35:30Z"
+  "updated_at": "2024-01-15T10:34:22Z"
 }
 ```
 
@@ -164,9 +159,8 @@ For full details on configuring webhook endpoints, verifying signatures, and han
 | Status              | Description                                                               | Terminal |
 |---------------------|---------------------------------------------------------------------------|----------|
 | `PENDING`           | Transaction created; awaiting compliance screening.                       | No       |
-| `SCREENING`         | Automated AML and sanctions checks in progress.                           | No       |
-| `AWAITING_REVIEW`   | Flagged by compliance engine; manual review required.                     | No       |
-| `AWAITING_APPROVAL` | Pending 4-Eye or 6-Eye multi-person approval.                             | No       |
+| `SCREENING`         | Automated AML and sanctions checks in progress; advances automatically on pass. | No       |
+| `AWAITING_APPROVAL` | Pending 4-Eye or 6-Eye multi-person approval, or held for compliance review. | No       |
 | `PROCESSING`        | Funds being collected from sender.                                        | No       |
 | `IN_TRANSIT`        | Funds dispatched to destination delivery network.                         | No       |
 | `DELIVERED`         | Funds credited to recipient.                                              | No       |

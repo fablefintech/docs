@@ -1,5 +1,5 @@
 ---
-title: "Compliance and KYC in Fable Fintech"
+title: "KYC, AML, and Sanctions Compliance in Fable Fintech"
 sidebarTitle: "Compliance & KYC"
 description: "Understand how Fable Fintech handles KYC verification, AML screening, sanctions checks, and 4-Eye/6-Eye approval workflows for compliant remittance."
 ---
@@ -52,10 +52,10 @@ Every transaction submitted to Fable is automatically screened against AML (Anti
 
 The AML screening process runs asynchronously immediately after transaction creation. During this stage, the transaction status is set to `SCREENING`. For the vast majority of transactions, screening completes within a few seconds and the transaction advances automatically.
 
-If the AML engine identifies a risk indicator — such as an unusually high transaction amount, a high-risk corridor, or a pattern consistent with structuring — the transaction is flagged and its status is updated to `AWAITING_REVIEW`. A compliance officer on your team, or Fable's managed compliance service if engaged, must review and clear or reject the transaction before it can proceed.
+If the AML engine identifies a risk indicator — such as an unusually high transaction amount, a high-risk corridor, or a pattern consistent with structuring — the transaction is flagged and held for manual review. A compliance officer on your team, or Fable's managed compliance service if engaged, must review and clear or reject the transaction before it can proceed.
 
 <Note>
-  All AML flags, review decisions, and reviewer identities are stored in a tamper-evident audit log accessible via the Compliance Dashboard and the `/compliance/audit` API endpoint.
+  All AML flags, review decisions, and reviewer identities are stored in a tamper-evident audit log accessible via the Compliance Dashboard.
 </Note>
 
 ## Sanctions Screening
