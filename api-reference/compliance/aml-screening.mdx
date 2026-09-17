@@ -1,0 +1,118 @@
+---
+title: "POST /compliance/aml — Run AML Screening"
+sidebarTitle: "AML Screening"
+description: "POST /compliance/aml — screens a customer or transaction against AML databases and returns a risk assessment."
+---
+
+Screen a customer or transaction against AML (Anti-Money Laundering) databases before processing a remittance. The screening evaluates the provided information against watchlists, politically exposed persons (PEP) databases, and adverse media sources, returning a risk score and match details. You can run AML screening independently or as part of your transaction compliance flow.
+
+## Endpoint
+
+```
+POST /compliance/aml
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Request Body
+
+<ParamField body="customer_id" type="string" required>
+  Your unique identifier for the customer being screened. This links the screening result to any associated transactions for that customer.
+</ParamField>
+
+<ParamField body="transaction_id" type="string">
+  The `transaction_id` of a specific transaction to associate with this screening. When provided, the screening result is linked to the transaction record and will influence its compliance status.
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  The full name of the individual or entity to screen.
+</ParamField>
+
+<ParamField body="country" type="string" required>
+  ISO 3166-1 alpha-2 country code associated with the customer or entity (e.g. `US`, `NG`, `PK`).
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api-sandbox.fablefintech.com/v1/compliance/aml \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cust_01HZ7ABCDE1234567890ABCD",
+    "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+    "name": "Jane Elizabeth Doe",
+    "country": "US"
+  }'
+```
+
+## Response Fields
+
+<ResponseField name="screening_id" type="string">
+  Unique identifier for this AML screening result. Reference this ID in support requests or when correlating with `compliance.screening_completed` webhook events.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The outcome of the screening. One of `CLEAR`, `FLAGGED`, or `REVIEW_REQUIRED`. See below for descriptions of each.
+</ResponseField>
+
+<ResponseField name="risk_score" type="number">
+  A numeric risk score between `0` and `100`. Higher scores indicate greater AML risk. A score of `0` means no risk signals were detected; scores above `75` typically result in a `FLAGGED` status.
+</ResponseField>
+
+<ResponseField name="matches" type="array">
+  An array of match objects describing any watchlist, PEP, or adverse media hits found. Empty when `status` is `CLEAR`.
+
+  <Expandable title="match object fields">
+    <ResponseField name="list" type="string">
+      The name of the database or list that produced this match (e.g. `PEP`, `ADVERSE_MEDIA`, `WATCHLIST`).
+    </ResponseField>
+    <ResponseField name="match_name" type="string">
+      The name of the matched entry as it appears in the source database.
+    </ResponseField>
+    <ResponseField name="match_score" type="number">
+      Confidence score for this specific match, between 0 and 100.
+    </ResponseField>
+    <ResponseField name="details" type="string">
+      A brief description of the matched record.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "screening_id": "aml_01HZSCR9876543210ABCDEFG",
+  "status": "CLEAR",
+  "risk_score": 4,
+  "matches": []
+}
+```
+
+**Example response with a match:**
+
+```json
+{
+  "screening_id": "aml_01HZSCR9876543210HIJKLMN",
+  "status": "FLAGGED",
+  "risk_score": 82,
+  "matches": [
+    {
+      "list": "PEP",
+      "match_name": "Jane E. Doe",
+      "match_score": 91,
+      "details": "Listed as a politically exposed person in the public records database."
+    }
+  ]
+}
+```
+
+<Warning>
+  A `FLAGGED` status means the transaction will be placed on a **compliance hold** and will not proceed to processing until a member of the Fable compliance team has reviewed and cleared it. Customers and counterparties will not be notified — do not inform them of the hold without consulting Fable's compliance guidance. If your system receives a `FLAGGED` status, you should not attempt to retry or re-submit the transaction.
+</Warning>

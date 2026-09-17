@@ -1,0 +1,187 @@
+---
+title: "POST /transactions — Create Remittance Transaction"
+sidebarTitle: "Create Transaction"
+description: "POST /transactions — initiates a new remittance transaction. Requires sender, receiver, amount, corridor, and channel. Returns transaction_id and initial status."
+---
+
+Use this endpoint to initiate a new cross-border remittance transaction. You must supply sender and receiver details, the amount and currencies, the corridor, and the delivery channel. Optionally, you can lock in an exchange rate by passing a `rate_id` obtained from `GET /fx/rates`. On success, the API returns a `transaction_id` and an initial status of `PENDING`.
+
+## Endpoint
+
+```
+POST /transactions
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Request Body
+
+<ParamField body="sender" type="object" required>
+  Details of the person or entity sending the funds.
+
+  <Expandable title="sender fields">
+    <ParamField body="name" type="string" required>
+      Full legal name of the sender.
+    </ParamField>
+
+    <ParamField body="country" type="string" required>
+      Two-letter ISO 3166-1 alpha-2 country code of the sender (e.g. `US`, `GB`).
+    </ParamField>
+
+    <ParamField body="currency" type="string" required>
+      ISO 4217 currency code of the sender's source currency (e.g. `USD`, `GBP`).
+    </ParamField>
+
+    <ParamField body="customer_id" type="string">
+      Your existing Fable customer ID for this sender. If provided, Fable will use the KYC data already on file. If omitted, the sender is treated as a new customer and must pass KYC before the transaction can proceed.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="receiver" type="object" required>
+  Details of the person or entity receiving the funds.
+
+  <Expandable title="receiver fields">
+    <ParamField body="name" type="string" required>
+      Full legal name of the receiver.
+    </ParamField>
+
+    <ParamField body="country" type="string" required>
+      Two-letter ISO 3166-1 alpha-2 country code of the destination country (e.g. `IN`, `MX`).
+    </ParamField>
+
+    <ParamField body="account_number" type="string">
+      Bank account number of the receiver. Required when `channel` is `BANK_TRANSFER`.
+    </ParamField>
+
+    <ParamField body="bank_code" type="string">
+      Bank identifier code — IFSC for India, SWIFT BIC for international wires, routing number for US ACH, etc. Required by some corridors when `channel` is `BANK_TRANSFER`.
+    </ParamField>
+
+    <ParamField body="mobile_wallet" type="string">
+      Mobile wallet identifier (e.g. phone number or wallet ID). Required when `channel` is `MOBILE_WALLET`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="amount" type="number" required>
+  The amount to send, denominated in `source_currency`. Must be a positive number. Minimum and maximum values vary by corridor.
+</ParamField>
+
+<ParamField body="source_currency" type="string" required>
+  ISO 4217 currency code of the currency being sent (e.g. `USD`).
+</ParamField>
+
+<ParamField body="destination_currency" type="string" required>
+  ISO 4217 currency code of the currency to be delivered to the receiver (e.g. `INR`).
+</ParamField>
+
+<ParamField body="corridor" type="string" required>
+  The send–receive country pair in `SOURCE-DESTINATION` format (e.g. `US-IN` for United States to India, `GB-MX` for United Kingdom to Mexico).
+</ParamField>
+
+<ParamField body="channel" type="string" required>
+  The delivery channel for the transaction. One of:
+  - `BANK_TRANSFER` — funds are deposited directly into the receiver's bank account.
+  - `MOBILE_WALLET` — funds are delivered to a mobile money wallet.
+  - `CASH_PICKUP` — receiver collects cash at an authorized pickup location.
+</ParamField>
+
+<ParamField body="rate_id" type="string">
+  The `rate_id` returned by `GET /fx/rates`. Including this locks the quoted exchange rate for this transaction. If omitted, the rate at the time of processing is applied. Rate IDs expire — check `valid_until` in the rates response.
+</ParamField>
+
+<ParamField body="reference" type="string">
+  Your internal reference ID for this transaction (e.g. your order ID). Must be unique across all transactions for your account. If a transaction with the same reference already exists, the API returns `DUPLICATE_TRANSACTION`.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api-sandbox.fablefintech.com/v1/transactions \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sender": {
+      "name": "Jane Doe",
+      "country": "US",
+      "currency": "USD",
+      "customer_id": "cust_01HZ7ABCDE1234567890ABCD"
+    },
+    "receiver": {
+      "name": "Rohan Sharma",
+      "country": "IN",
+      "account_number": "9876543210",
+      "bank_code": "HDFC0001234"
+    },
+    "amount": 1000.00,
+    "source_currency": "USD",
+    "destination_currency": "INR",
+    "corridor": "US-IN",
+    "channel": "BANK_TRANSFER",
+    "rate_id": "rate_01HZ8MKBNK3J2F4P8GRWSV7AAX",
+    "reference": "order_20240615_001"
+  }'
+```
+
+## Response Fields
+
+<ResponseField name="transaction_id" type="string">
+  Unique identifier for the transaction. Use this ID to retrieve status, cancel, or reference the transaction in FX deal utilization.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current status of the transaction. Always `PENDING` immediately after creation. See [Transaction Status](/api-reference/remittance/transaction-status) for the full status lifecycle.
+</ResponseField>
+
+<ResponseField name="amount" type="number">
+  The source amount as submitted in the request.
+</ResponseField>
+
+<ResponseField name="source_currency" type="string">
+  ISO 4217 code of the source currency.
+</ResponseField>
+
+<ResponseField name="destination_currency" type="string">
+  ISO 4217 code of the destination currency.
+</ResponseField>
+
+<ResponseField name="exchange_rate" type="number">
+  The exchange rate applied to this transaction (source to destination). If a `rate_id` was provided and is still valid, this reflects that locked rate. Otherwise it reflects the rate at the time of transaction creation.
+</ResponseField>
+
+<ResponseField name="destination_amount" type="number">
+  The amount that will be delivered to the receiver in `destination_currency`, calculated as `amount × exchange_rate`.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of when the transaction was created (e.g. `2024-06-15T10:30:00Z`).
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+  "status": "PENDING",
+  "amount": 1000.00,
+  "source_currency": "USD",
+  "destination_currency": "INR",
+  "exchange_rate": 83.42,
+  "destination_amount": 83420.00,
+  "created_at": "2024-06-15T10:30:00Z"
+}
+```
+
+## Error Codes
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `INVALID_CORRIDOR` | 400 | The specified corridor is not supported or not enabled for your account. |
+| `RATE_EXPIRED` | 409 | The `rate_id` you provided has expired. Fetch a new rate from `GET /fx/rates` and retry. |
+| `KYC_REQUIRED` | 403 | The sender has not completed KYC verification. Submit a KYC request via `POST /compliance/kyc` before initiating the transaction. |

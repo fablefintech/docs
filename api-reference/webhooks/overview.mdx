@@ -1,0 +1,174 @@
+---
+title: "Webhooks API — Register Endpoints and Manage Subscriptions"
+sidebarTitle: "Webhooks Overview"
+description: "POST /webhooks — register a URL to receive real-time event notifications from Fable Fintech. Supports transaction and compliance events."
+---
+
+Register webhook endpoints to receive real-time push notifications from Fable instead of polling the API for status changes. When a subscribed event occurs — such as a transaction status change or a completed KYC check — Fable sends an HTTP POST request containing a JSON payload to your registered URL. Your endpoint must respond with a `2xx` status code within 10 seconds to acknowledge receipt.
+
+## Register an Endpoint
+
+Send a `POST /webhooks` request with the URL you want to receive events, the list of event types to subscribe to, and a secret used to verify payload signatures.
+
+**Endpoint:**
+
+```
+POST /webhooks
+```
+
+**Request Body:**
+
+<ParamField body="url" type="string" required>
+  The HTTPS URL of your webhook receiver endpoint. Must be publicly accessible and respond to POST requests. HTTP (non-TLS) URLs are not accepted.
+</ParamField>
+
+<ParamField body="events" type="array" required>
+  An array of event type strings you want to subscribe to. See [Event Types](/api-reference/webhooks/events) for all available events. Use `["*"]` to subscribe to all events.
+</ParamField>
+
+<ParamField body="secret" type="string" required>
+  A secret string used to generate and verify the HMAC-SHA256 signature attached to every webhook delivery. Choose a random, high-entropy string and store it securely. You will use this to validate incoming payloads on your server.
+</ParamField>
+
+**Example Request:**
+
+```bash
+curl -X POST https://api-sandbox.fablefintech.com/v1/webhooks \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://yourapp.example.com/webhooks/fable",
+    "events": [
+      "transaction.status_changed",
+      "transaction.delivered",
+      "compliance.kyc_completed"
+    ],
+    "secret": "whsec_your_random_secret_here"
+  }'
+```
+
+**Example Response:**
+
+```json
+{
+  "webhook_id": "wh_01HZWBK9876543210ABCDEFG",
+  "url": "https://yourapp.example.com/webhooks/fable",
+  "events": [
+    "transaction.status_changed",
+    "transaction.delivered",
+    "compliance.kyc_completed"
+  ],
+  "created_at": "2024-06-15T09:00:00Z"
+}
+```
+
+## List Registered Webhooks
+
+Retrieve all webhook endpoints registered for your account.
+
+**Endpoint:**
+
+```
+GET /webhooks
+```
+
+**Example Request:**
+
+```bash
+curl https://api-sandbox.fablefintech.com/v1/webhooks \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j"
+```
+
+**Example Response:**
+
+```json
+{
+  "webhooks": [
+    {
+      "webhook_id": "wh_01HZWBK9876543210ABCDEFG",
+      "url": "https://yourapp.example.com/webhooks/fable",
+      "events": ["transaction.status_changed", "transaction.delivered"],
+      "created_at": "2024-06-15T09:00:00Z"
+    }
+  ]
+}
+```
+
+## Delete a Webhook
+
+Remove a registered webhook endpoint. Fable will stop sending events to the deleted URL immediately.
+
+**Endpoint:**
+
+```
+DELETE /webhooks/{webhook_id}
+```
+
+**Example Request:**
+
+```bash
+curl -X DELETE https://api-sandbox.fablefintech.com/v1/webhooks/wh_01HZWBK9876543210ABCDEFG \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j"
+```
+
+Returns `204 No Content` on success.
+
+## Signature Verification
+
+Fable signs every webhook payload using HMAC-SHA256 with the secret you provided at registration. The signature is included in the `X-Fable-Signature` request header in the format `sha256=<hex_digest>`.
+
+To verify a payload on your server:
+
+1. Read the raw request body as bytes (do not parse JSON before verifying).
+2. Compute the HMAC-SHA256 of the raw body using your webhook secret as the key.
+3. Compare your computed digest to the value in `X-Fable-Signature`. Use a constant-time comparison to prevent timing attacks.
+
+**Verification example (Node.js):**
+
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhookSignature(rawBody, signature, secret) {
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(expected),
+    Buffer.from(signature)
+  );
+}
+```
+
+**Verification example (Python):**
+
+```python
+import hmac
+import hashlib
+
+def verify_webhook_signature(raw_body: bytes, signature: str, secret: str) -> bool:
+    expected = 'sha256=' + hmac.new(
+        secret.encode(),
+        raw_body,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+```
+
+Reject any payload for which the signature does not match — this protects your system against forged or tampered events.
+
+## Retry Policy
+
+If your endpoint does not return a `2xx` HTTP status code within 10 seconds, Fable treats the delivery as failed and retries automatically. Retries follow an exponential backoff schedule:
+
+| Attempt | Delay After Previous |
+|---------|----------------------|
+| 1 (initial) | — |
+| 2 | 1 minute |
+| 3 | 5 minutes |
+| 4 | 30 minutes |
+| 5 | 2 hours |
+| 6 (final) | 6 hours |
+
+After 6 failed attempts, Fable stops retrying and logs the event as undelivered. You can retrieve missed events by querying the relevant resource endpoint directly. To avoid duplicate processing, make your webhook handler idempotent — use the `event_id` field in the payload to deduplicate deliveries.

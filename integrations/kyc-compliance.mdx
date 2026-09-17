@@ -1,0 +1,77 @@
+---
+title: "KYC and Compliance Integration Partners"
+sidebarTitle: "KYC & Compliance"
+description: "Fable Fintech integrates with Jumio, Trulioo, Shufti Pro, and other providers for automated KYC identity verification and AML/sanctions screening."
+---
+
+Regulatory compliance is non-negotiable in cross-border payments, and building individual integrations with KYC and AML providers is costly and time-consuming. Fable's compliance stack integrates with best-in-class identity verification and AML providers — so you don't have to build these integrations yourself. During onboarding, your team works with Fable to select the KYC and AML providers that meet your regulatory requirements and corridor needs, and Fable handles the connectivity, data routing, and result handling end-to-end.
+
+## Identity Verification (KYC) Partners
+
+Fable supports the following identity verification providers for automated customer onboarding and document verification.
+
+<CardGroup cols={2}>
+  <Card title="KYC & Identity Verification" icon="id-card">
+    **Jumio** — AI-powered document verification with liveness detection and face match. Supports passports, national IDs, and driving licences from 200+ countries.
+
+    **Shufti Pro** — Global identity verification platform covering 150+ countries with support for document OCR, face verification, and address verification.
+
+    **Trulioo** — Identity and business verification across 100+ countries, with access to authoritative identity data sources for both consumer and business KYB checks.
+
+    **AccuSystems** — Document management and compliance platform for financial institutions, supporting structured document collection, storage, and audit trail requirements.
+  </Card>
+  <Card title="AML & Sanctions Screening" icon="magnifying-glass-chart">
+    **ComplyAdvantage** — Real-time AML screening and financial crime risk intelligence. Covers PEP lists, sanctions (OFAC, UN, EU, FATF), adverse media, and watchlists with continuous monitoring.
+
+    **AML Database Providers** — Fable also integrates with additional AML data providers for sanctions screening against major regulatory lists including OFAC (US), the UN Consolidated List, EU restrictive measures, and HM Treasury (UK).
+  </Card>
+</CardGroup>
+
+### Provider Details
+
+**Jumio**
+Jumio uses AI and machine learning to verify the authenticity of identity documents and confirm that the person presenting the document matches the photo on file. It supports over 5,000 document types from 200+ countries and is well-suited for fully digital customer onboarding flows where liveness checks are required.
+
+**Shufti Pro**
+Shufti Pro provides global identity verification with coverage across 150+ countries. Its capabilities include ID document verification, biometric face matching, address verification, and consent verification. Shufti Pro is a flexible option for institutions operating across multiple regions with varying document types.
+
+**Trulioo**
+Trulioo connects to authoritative data sources — credit bureaus, government databases, and utility records — to verify identities without requiring document upload in markets where data-based verification is preferred or required. It also supports business verification (KYB) for institutional customers and SME clients.
+
+**AccuSystems**
+AccuSystems is focused on document management and compliance workflow for financial institutions. It provides structured collection, indexing, and retrieval of customer documents, supporting your compliance team with audit-ready records and exception management.
+
+**ComplyAdvantage**
+ComplyAdvantage provides real-time AML screening against a proprietary database of financial crime risk entities, including sanctioned individuals and entities, politically exposed persons (PEPs), and adverse media. It supports both one-time screening at onboarding and ongoing monitoring for changes in customer risk status.
+
+## How It Works
+
+The following steps describe how Fable routes a customer through the KYC and compliance process using your configured providers.
+
+<Steps>
+  <Step title="Customer Submits ID Documents">
+    Your customer submits their identity documents — such as a passport, national ID, or driving licence — through your application's onboarding flow. Fable's API accepts the document data or triggers the configured provider's hosted verification flow.
+  </Step>
+  <Step title="Fable Routes to Your Configured KYC Provider">
+    Fable routes the verification request to the KYC provider configured for the customer's corridor or jurisdiction — for example, Jumio for biometric document checks or Trulioo for data-based identity verification. Your implementation determines the routing logic.
+  </Step>
+  <Step title="Verification Result Returned">
+    The KYC provider returns a verification result — approved, declined, or referred for manual review — along with extracted document data and any confidence scores. Fable surfaces this result through the compliance API so your system can act on it immediately.
+  </Step>
+  <Step title="AML and Sanctions Screening Runs">
+    In parallel or following KYC approval, Fable submits the customer's details to your configured AML screening provider (such as ComplyAdvantage) for sanctions, PEP, and watchlist checks. Screening can be configured to run at onboarding, at each transaction, or on a scheduled ongoing monitoring basis.
+  </Step>
+  <Step title="Customer Approved or Flagged for Review">
+    If both KYC and AML checks pass, the customer is approved and can proceed to transact. If any check returns a match or a risk flag, the customer is placed in a review queue for your compliance team to assess before funds are moved.
+  </Step>
+</Steps>
+
+## Integration Configuration
+
+Your choice of KYC and AML provider is configured during onboarding based on your regulatory environment, the countries you serve, and your existing vendor relationships. Fable supports configuring different providers for different corridors — for example, using one document verification provider for customers in the EU and a different one for customers in Southeast Asia.
+
+Providers can also be swapped or layered as your business evolves. If you need to change your KYC provider, add a second AML screening layer, or expand into a corridor that requires a different compliance approach, your Fable account manager can coordinate the configuration update without requiring changes to your core integration.
+
+<Tip>
+  Consider implementing tiered KYC to balance compliance rigour with customer experience. For low-value transactions below your regulatory threshold, a lightweight data-based check (such as Trulioo) may be sufficient. Reserve full document verification with liveness detection (such as Jumio) for higher-value transactions or customers flagged for enhanced due diligence. Fable's compliance routing supports threshold-based provider selection out of the box.
+</Tip>

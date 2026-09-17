@@ -1,0 +1,67 @@
+---
+title: "DELETE /transactions/{id} — Cancel Transaction"
+sidebarTitle: "Cancel Transaction"
+description: "DELETE /transactions/{id} — cancels a pending transaction before it enters processing. Returns 409 if the transaction cannot be cancelled."
+---
+
+Cancel a transaction that has not yet entered the processing stage. Cancellation is only available for transactions in `PENDING` or `SCREENING` status. Once a transaction moves to `PROCESSING` — meaning funds movement has begun — it can no longer be cancelled through the API and must be handled through Fable's support process.
+
+## Endpoint
+
+```
+DELETE /transactions/{transaction_id}
+```
+
+## Cancellation Window
+
+Transactions can only be cancelled while they are in one of the following statuses:
+
+| Status | Cancellable |
+|--------|-------------|
+| `PENDING` | ✅ Yes |
+| `SCREENING` | ✅ Yes |
+| `AWAITING_APPROVAL` | ✅ Yes |
+| `PROCESSING` | ❌ No |
+| `IN_TRANSIT` | ❌ No |
+| `DELIVERED` | ❌ No |
+| `SETTLED` | ❌ No |
+| `FAILED` | ❌ No (already terminal) |
+| `CANCELLED` | ❌ No (already terminal) |
+
+Once `PROCESSING` begins, funds movement is underway and Fable cannot guarantee reversal through the API alone. Contact Fable support if you need to attempt a recall on a transaction that has already entered processing.
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Path Parameters
+
+<ParamField path="transaction_id" type="string" required>
+  The unique identifier of the transaction to cancel. This is the `transaction_id` returned when the transaction was created.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X DELETE https://api-sandbox.fablefintech.com/v1/transactions/txn_01HZ9QKBNK3J2F4P8GRWSV7MEX \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json"
+```
+
+## Response
+
+On success, the API returns `204 No Content` with an empty response body. The transaction status is updated to `CANCELLED`, and a `transaction.cancelled` webhook event is dispatched to any registered endpoints subscribed to that event type.
+
+```
+HTTP/1.1 204 No Content
+```
+
+## Error Codes
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `TRANSACTION_NOT_FOUND` | 404 | No transaction exists with the provided `transaction_id`. Verify the ID and retry. |
+| `CANNOT_CANCEL` | 409 | The transaction has already entered or passed the processing stage and cannot be cancelled via the API. Contact Fable support for recall options. |

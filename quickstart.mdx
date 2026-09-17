@@ -1,47 +1,116 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with Fable Fintech APIs"
+sidebarTitle: "Quick Start"
+description: "Learn how to authenticate, create your first test transaction, and verify your Fable Fintech integration in under 10 minutes."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+This guide walks you through everything you need to send your first cross-border transaction using the Fable Fintech API. You will go from zero to a verified sandbox integration in three stages: setting up your sandbox environment, authenticating your requests, and executing a test transaction end-to-end. No production credentials or real funds are required to complete this guide.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+<Note>
+  All transactions executed in the sandbox environment are simulated. No real money moves, and no live banking networks are touched during testing.
+</Note>
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Request Sandbox Access">
+    Before you can make API calls, you need a set of sandbox credentials — an API key and a dedicated base URL scoped to your organization's test environment.
 
-    ```bash
-    npm install your-package
-    ```
+    To request access, visit [fablefintech.com/contact](https://fablefintech.com/contact) and submit a sandbox access request. The Fable team will provision your credentials and send them to you directly, typically within one business day. You will receive:
+
+    - A **sandbox API key** tied to your organization
+    - A **base URL** for the sandbox environment
+    - Confirmation of which product APIs are enabled for your account
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Set Your Credentials">
+    Once you have your credentials, store them as environment variables so you can reference them safely in all subsequent API calls without hard-coding sensitive values in your scripts.
 
     ```bash
-    your-cli init
+    export FABLE_API_KEY="your_api_key_here"
+    export FABLE_BASE_URL="https://api-sandbox.fablefintech.com/v1"
     ```
+
+    You can add these exports to your shell profile (e.g. `~/.zshrc` or `~/.bashrc`) to persist them across terminal sessions. For CI/CD pipelines, inject them as encrypted secrets through your platform's environment variable management.
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Create a Test Transaction">
+    With your credentials in place, you are ready to initiate your first test remittance. The example below creates a USD-to-INR transfer via the US-to-India corridor, one of the most common remittance routes on the platform.
 
     ```bash
-    your-cli start
+    curl -X POST "$FABLE_BASE_URL/transactions" \
+      -H "Authorization: Bearer $FABLE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "sender": {
+          "name": "John Doe",
+          "country": "US",
+          "currency": "USD"
+        },
+        "receiver": {
+          "name": "Jane Smith",
+          "country": "IN",
+          "account_number": "123456789012",
+          "ifsc_code": "HDFC0001234"
+        },
+        "amount": 500.00,
+        "source_currency": "USD",
+        "destination_currency": "INR",
+        "corridor": "US-IN"
+      }'
     ```
+
+    The `corridor` field identifies the sending and receiving country pair. The `ifsc_code` in the receiver object is specific to Indian bank accounts; the required beneficiary fields will vary by destination country and payout method.
+  </Step>
+
+  <Step title="Check the Response">
+    A successful request returns a `201 Created` response with a transaction object. The `transaction_id` is your primary reference for tracking this transfer throughout its lifecycle.
+
+    ```json
+    {
+      "transaction_id": "TXN-20240115-ABC123",
+      "status": "PENDING",
+      "amount": 500.00,
+      "source_currency": "USD",
+      "destination_currency": "INR",
+      "exchange_rate": 83.25,
+      "destination_amount": 41625.00,
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+    ```
+
+    The `status` field will be `PENDING` immediately after creation. As the transaction progresses through compliance checks, FX conversion, and payout processing, the status will update accordingly. Save the `transaction_id` — you will need it to poll for status updates in the next step.
+  </Step>
+
+  <Step title="Poll Transaction Status">
+    Use the status endpoint to check where your transaction is in the processing pipeline. Replace `{id}` with the `transaction_id` returned in the previous step.
+
+    ```bash
+    curl -X GET "$FABLE_BASE_URL/transactions/TXN-20240115-ABC123/status" \
+      -H "Authorization: Bearer $FABLE_API_KEY"
+    ```
+
+    The response will include the current `status` and any relevant processing timestamps:
+
+    ```json
+    {
+      "transaction_id": "TXN-20240115-ABC123",
+      "status": "COMPLETED",
+      "updated_at": "2024-01-15T10:35:22Z"
+    }
+    ```
+
+    Common status values you will encounter include `PENDING`, `PROCESSING`, `COMPLIANCE_REVIEW`, `COMPLETED`, and `FAILED`. In the sandbox, most transactions will move to `COMPLETED` within a few seconds of creation.
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Next Steps
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+You have successfully created and tracked your first test transaction. From here, explore how to secure your integration and browse the full API reference.
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Understand how Bearer token authentication works, review error codes, and follow best practices for keeping your API keys secure.
+  </Card>
+  <Card title="API Reference" icon="book-open" href="/api-reference/overview">
+    Explore the complete API reference for all endpoints across DigiRemit, BizPay, DigiBureau, and the full Fable product suite.
+  </Card>
+</CardGroup>

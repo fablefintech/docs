@@ -1,0 +1,100 @@
+---
+title: "Understanding Payment Corridors and Channels"
+sidebarTitle: "Corridors & Channels"
+description: "Learn how Fable Fintech defines payment corridors (country pairs) and channels (delivery methods) to configure and route cross-border transfers."
+---
+
+Every cross-border payment in Fable Fintech is routed through two foundational concepts: a **corridor** and a **channel**. A corridor defines *where* money moves — the source and destination country pair — while a channel defines *how* it gets there, such as a bank transfer, mobile wallet credit, or cash pickup. Together, these two parameters tell the Fable platform exactly how to price, route, and deliver a transaction, giving you precise control over your payment flows without managing the underlying network complexity yourself.
+
+## Corridors
+
+A corridor is the combination of a source country and a destination country through which a remittance or payment flows. Fable Fintech supports **multi-corridor operations**, meaning a single integration can serve dozens of country pairs simultaneously, each with its own rate, fee structure, compliance rules, and delivery network.
+
+Corridors are identified using a simple hyphenated code combining the two-letter ISO country codes of the sending and receiving countries — for example, `US-IN` represents the United States-to-India corridor, and `GB-IN` represents the United Kingdom-to-India corridor.
+
+When building API requests, you specify the corridor explicitly using the `corridor` field. This allows the platform to:
+
+- Apply the correct FX rate and fee schedule for that country pair.
+- Route the transaction through the appropriate licensed partner network.
+- Enforce jurisdiction-specific compliance and AML rules.
+- Determine which channels and payout methods are available.
+
+### Common Corridors
+
+The table below lists frequently used corridors available on the Fable platform. Availability depends on your specific integration and the products you have enabled.
+
+| Corridor Code | Source Country      | Destination Country | Common Use Case                  |
+|---------------|---------------------|---------------------|----------------------------------|
+| `US-IN`       | United States       | India               | Diaspora remittance, SME payouts |
+| `GB-IN`       | United Kingdom      | India               | Diaspora remittance              |
+| `AE-IN`       | United Arab Emirates| India               | Gulf worker remittances          |
+| `SG-IN`       | Singapore           | India               | Professional transfers, SME      |
+| `AU-IN`       | Australia           | India               | Diaspora remittance              |
+
+<Note>
+  Fable's network spans well beyond these examples. If you require a corridor not listed here, contact your Fable account team to confirm availability and onboarding timelines.
+</Note>
+
+## Channels
+
+A channel describes the delivery mechanism used to credit funds to the recipient. The channel you select determines how and where the recipient receives their money. Fable supports three primary channel types across its product suite.
+
+### Bank Account Transfer
+
+The most widely used channel. Funds are credited directly to the recipient's bank account using the local clearing network — such as NEFT/IMPS/RTGS in India, Faster Payments in the UK, or ACH in the US. This channel is ideal for high-value transfers and business payments where a full audit trail and account-level attribution are required.
+
+Use this channel when:
+- The recipient has a verified bank account.
+- You are processing business-to-business (B2B) payments via BizPay.
+- Settlement finality and traceability are priorities.
+
+### Mobile Wallet
+
+Funds are credited directly to the recipient's registered mobile wallet, such as UPI-linked wallets in India or other domestic mobile money services. This channel is best suited for consumer remittances where recipients may not have a full bank account but do have a mobile money identity.
+
+Use this channel when:
+- The recipient is registered on a supported mobile wallet network.
+- You need fast, low-cost delivery to underbanked populations.
+- The corridor supports wallet delivery (confirm with your Fable integration).
+
+### Cash Pickup
+
+The recipient collects funds in cash from an authorised agent location or partner outlet. This channel is powered by Fable's partnerships with global last-mile networks and is suited for recipients without bank accounts or wallet access.
+
+Use this channel when:
+- The recipient lacks a bank account or mobile wallet.
+- The destination corridor has a supported cash agent network.
+- You are operating a consumer-facing remittance product via DigiRemit.
+
+## Corridor Configuration
+
+Corridor and channel availability is **configured per integration**. Not all corridors or channel types are enabled by default — your account is provisioned with the specific corridors and delivery methods relevant to your business and regulatory approvals.
+
+To enable a new corridor or add a channel type to an existing corridor, contact Fable Support or your dedicated account manager. New corridors may require additional compliance setup, partner agreements, and licensing checks depending on the jurisdictions involved.
+
+## API Example
+
+When initiating a transaction, include both `corridor` and `channel` in your request body alongside the currency pair. The platform uses these fields to determine routing, rates, and compliance rules before processing.
+
+```json
+{
+  "corridor": "US-IN",
+  "channel": "BANK_TRANSFER",
+  "source_currency": "USD",
+  "destination_currency": "INR",
+  "source_amount": 500.00,
+  "recipient_id": "RCP-20240115-DEF456",
+  "rate_id": "RATE-20240115-XYZ789"
+}
+```
+
+| Field                  | Type   | Description                                                                 |
+|------------------------|--------|-----------------------------------------------------------------------------|
+| `corridor`             | string | Hyphenated ISO country code pair (e.g., `US-IN`).                          |
+| `channel`              | string | Delivery method: `BANK_TRANSFER`, `MOBILE_WALLET`, or `CASH_PICKUP`.       |
+| `source_currency`      | string | ISO 4217 currency code of the sending currency (e.g., `USD`).              |
+| `destination_currency` | string | ISO 4217 currency code of the receiving currency (e.g., `INR`).            |
+
+<Warning>
+  Mismatched corridor and currency combinations will result in a validation error. Ensure the `source_currency` and `destination_currency` are valid for the specified `corridor` before submitting a transaction request.
+</Warning>

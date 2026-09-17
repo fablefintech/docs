@@ -1,0 +1,303 @@
+---
+title: "Code Example: Send a Cross-Border Remittance"
+sidebarTitle: "Send Remittance"
+description: "Complete end-to-end code examples for sending a cross-border remittance with Fable Fintech — from rate fetch to delivery tracking — in three languages."
+---
+
+These end-to-end examples demonstrate a complete remittance flow: fetch rate → submit KYC → create transaction → track status. Each example is self-contained and covers the full lifecycle in a single function. Copy and adapt them for your integration.
+
+<Note>
+  These examples use sandbox credentials and do not move real money. To point at the production environment, change `environment` from `sandbox` / `SANDBOX` to `production` / `PRODUCTION` and replace your sandbox API key with your production key.
+</Note>
+
+<CodeGroup>
+
+```typescript JavaScript
+import { FableClient, FableApiError } from '@fable-fintech/sdk';
+
+const fable = new FableClient({
+  apiKey: process.env.FABLE_API_KEY,
+  environment: 'sandbox',
+});
+
+async function sendRemittance() {
+  // Step 1: Fetch the current FX rate for the corridor
+  const rate = await fable.fx.getRate({ from: 'USD', to: 'INR' });
+  console.log(`Live rate: ${rate.rate} (valid until ${rate.valid_until})`);
+
+  // Step 2: Submit KYC for the sender if not already approved
+  const kyc = await fable.compliance.submitKyc({
+    customer_id: 'CUST-001',
+    full_name: 'John Doe',
+    date_of_birth: '1990-01-15',
+    nationality: 'US',
+    id_type: 'PASSPORT',
+    id_number: 'A12345678',
+    id_expiry: '2030-01-15',
+  });
+
+  if (kyc.status === 'REJECTED') {
+    throw new Error(`KYC rejected: ${kyc.rejection_reason}`);
+  }
+  console.log(`KYC status: ${kyc.status}`);
+
+  // Step 3: Book an FX deal to lock the rate
+  const deal = await fable.fx.bookDeal({
+    from: 'USD',
+    to: 'INR',
+    amount: 500,
+    corridor: 'US-IN',
+  });
+  console.log(`FX deal booked: ${deal.deal_id}, locked rate: ${deal.locked_rate}`);
+
+  // Step 4: Create the transaction referencing the locked deal
+  const transaction = await fable.transactions.create({
+    sender: { name: 'John Doe', country: 'US', currency: 'USD' },
+    receiver: {
+      name: 'Jane Smith',
+      country: 'IN',
+      account_number: '123456789012',
+      bank_code: 'HDFC0001234',
+    },
+    amount: 500,
+    source_currency: 'USD',
+    destination_currency: 'INR',
+    corridor: 'US-IN',
+    channel: 'BANK_TRANSFER',
+    fx_deal_id: deal.deal_id,
+  });
+  console.log(`Transaction created: ${transaction.transaction_id}`);
+
+  // Step 5: Mark the FX deal as utilized
+  await fable.fx.utilizeDeal(deal.deal_id, {
+    transaction_id: transaction.transaction_id,
+  });
+
+  // Step 6: Poll for terminal status
+  let currentStatus = transaction.status;
+  const terminalStates = new Set(['COMPLETED', 'FAILED', 'CANCELLED']);
+
+  while (!terminalStates.has(currentStatus)) {
+    await new Promise((resolve) => setTimeout(resolve, 5000)); // wait 5s
+    const statusResponse = await fable.transactions.getStatus(
+      transaction.transaction_id
+    );
+    currentStatus = statusResponse.status;
+    console.log(`Status: ${currentStatus}`);
+  }
+
+  if (currentStatus === 'COMPLETED') {
+    console.log('Remittance delivered successfully.');
+  } else {
+    console.error(`Transaction ended with status: ${currentStatus}`);
+  }
+
+  return transaction;
+}
+
+sendRemittance().catch((err) => {
+  if (err instanceof FableApiError) {
+    console.error(`Fable API error [${err.code}]: ${err.message}`);
+  } else {
+    console.error(err);
+  }
+});
+```
+
+```python Python
+import time
+from fable_fintech import FableClient
+from fable_fintech.exceptions import FableApiError
+
+client = FableClient(
+    api_key="your_sandbox_api_key",
+    environment="sandbox",
+)
+
+
+def send_remittance():
+    # Step 1: Fetch the current FX rate for the corridor
+    rate = client.fx.get_rate(from_currency="USD", to_currency="INR")
+    print(f"Live rate: {rate.rate} (valid until {rate.valid_until})")
+
+    # Step 2: Submit KYC for the sender if not already approved
+    kyc = client.compliance.submit_kyc(
+        customer_id="CUST-001",
+        full_name="John Doe",
+        date_of_birth="1990-01-15",
+        nationality="US",
+        id_type="PASSPORT",
+        id_number="A12345678",
+        id_expiry="2030-01-15",
+    )
+
+    if kyc.status == "REJECTED":
+        raise ValueError(f"KYC rejected: {kyc.rejection_reason}")
+    print(f"KYC status: {kyc.status}")
+
+    # Step 3: Book an FX deal to lock the rate
+    deal = client.fx.book_deal(
+        from_currency="USD",
+        to_currency="INR",
+        amount=500.00,
+        corridor="US-IN",
+    )
+    print(f"FX deal booked: {deal.deal_id}, locked rate: {deal.locked_rate}")
+
+    # Step 4: Create the transaction referencing the locked deal
+    transaction = client.transactions.create(
+        sender={"name": "John Doe", "country": "US", "currency": "USD"},
+        receiver={
+            "name": "Jane Smith",
+            "country": "IN",
+            "account_number": "123456789012",
+            "bank_code": "HDFC0001234",
+        },
+        amount=500.00,
+        source_currency="USD",
+        destination_currency="INR",
+        corridor="US-IN",
+        channel="BANK_TRANSFER",
+        fx_deal_id=deal.deal_id,
+    )
+    print(f"Transaction created: {transaction.transaction_id}")
+
+    # Step 5: Mark the FX deal as utilized
+    client.fx.utilize_deal(deal.deal_id, transaction_id=transaction.transaction_id)
+
+    # Step 6: Poll for terminal status
+    terminal_states = {"COMPLETED", "FAILED", "CANCELLED"}
+    current_status = transaction.status
+
+    while current_status not in terminal_states:
+        time.sleep(5)
+        status_response = client.transactions.get_status(transaction.transaction_id)
+        current_status = status_response.status
+        print(f"Status: {current_status}")
+
+    if current_status == "COMPLETED":
+        print("Remittance delivered successfully.")
+    else:
+        print(f"Transaction ended with status: {current_status}")
+
+    return transaction
+
+
+if __name__ == "__main__":
+    try:
+        send_remittance()
+    except FableApiError as e:
+        print(f"Fable API error [{e.code}]: {e.message}")
+```
+
+```java Java
+import com.fablefintech.FableClient;
+import com.fablefintech.exception.FableApiException;
+import com.fablefintech.model.*;
+import java.math.BigDecimal;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+public class SendRemittanceExample {
+
+    private static final Set<String> TERMINAL_STATES =
+        Set.of("COMPLETED", "FAILED", "CANCELLED");
+
+    public static void main(String[] args) throws InterruptedException {
+        FableClient client = FableClient.builder()
+            .apiKey(System.getenv("FABLE_API_KEY"))
+            .environment(Environment.SANDBOX)
+            .build();
+
+        try {
+            sendRemittance(client);
+        } catch (FableApiException e) {
+            System.err.printf("Fable API error [%s]: %s%n", e.getCode(), e.getMessage());
+        }
+    }
+
+    static Transaction sendRemittance(FableClient client)
+            throws FableApiException, InterruptedException {
+
+        // Step 1: Fetch the current FX rate for the corridor
+        FxRate rate = client.fx().getRate("USD", "INR");
+        System.out.printf("Live rate: %s (valid until %s)%n",
+            rate.getRate(), rate.getValidUntil());
+
+        // Step 2: Submit KYC for the sender if not already approved
+        KycRequest kycRequest = KycRequest.builder()
+            .customerId("CUST-001")
+            .fullName("John Doe")
+            .dateOfBirth("1990-01-15")
+            .nationality("US")
+            .idType(IdType.PASSPORT)
+            .idNumber("A12345678")
+            .idExpiry("2030-01-15")
+            .build();
+
+        KycResult kyc = client.compliance().submitKyc(kycRequest);
+        if ("REJECTED".equals(kyc.getStatus())) {
+            throw new IllegalStateException("KYC rejected: " + kyc.getRejectionReason());
+        }
+        System.out.println("KYC status: " + kyc.getStatus());
+
+        // Step 3: Book an FX deal to lock the rate
+        BookDealRequest dealRequest = BookDealRequest.builder()
+            .fromCurrency("USD")
+            .toCurrency("INR")
+            .amount(BigDecimal.valueOf(500))
+            .corridor("US-IN")
+            .build();
+
+        FxDeal deal = client.fx().bookDeal(dealRequest);
+        System.out.printf("FX deal booked: %s, locked rate: %s%n",
+            deal.getDealId(), deal.getLockedRate());
+
+        // Step 4: Create the transaction referencing the locked deal
+        CreateTransactionRequest txRequest = CreateTransactionRequest.builder()
+            .sender(Sender.builder().name("John Doe").country("US").currency("USD").build())
+            .receiver(Receiver.builder()
+                .name("Jane Smith")
+                .country("IN")
+                .accountNumber("123456789012")
+                .bankCode("HDFC0001234")
+                .build())
+            .amount(BigDecimal.valueOf(500))
+            .sourceCurrency("USD")
+            .destinationCurrency("INR")
+            .corridor("US-IN")
+            .channel(Channel.BANK_TRANSFER)
+            .fxDealId(deal.getDealId())
+            .build();
+
+        Transaction transaction = client.transactions().create(txRequest);
+        System.out.println("Transaction created: " + transaction.getTransactionId());
+
+        // Step 5: Mark the FX deal as utilized
+        UtilizeDealRequest utilizeRequest = UtilizeDealRequest.builder()
+            .transactionId(transaction.getTransactionId())
+            .build();
+        client.fx().utilizeDeal(deal.getDealId(), utilizeRequest);
+
+        // Step 6: Poll for terminal status
+        String currentStatus = transaction.getStatus();
+        while (!TERMINAL_STATES.contains(currentStatus)) {
+            TimeUnit.SECONDS.sleep(5);
+            TransactionStatus statusResponse = client.transactions()
+                .getStatus(transaction.getTransactionId());
+            currentStatus = statusResponse.getStatus();
+            System.out.println("Status: " + currentStatus);
+        }
+
+        if ("COMPLETED".equals(currentStatus)) {
+            System.out.println("Remittance delivered successfully.");
+        } else {
+            System.out.println("Transaction ended with status: " + currentStatus);
+        }
+
+        return transaction;
+    }
+}
+```
+
+</CodeGroup>

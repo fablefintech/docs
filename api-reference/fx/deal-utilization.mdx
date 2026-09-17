@@ -1,0 +1,85 @@
+---
+title: "POST /fx/deals/{id}/utilize — Utilize an FX Deal"
+sidebarTitle: "Deal Utilization"
+description: "POST /fx/deals/{id}/utilize — marks a booked FX deal as utilized after the associated funds transfer has been confirmed."
+---
+
+Mark a previously booked FX deal as utilized once the underlying funds transfer is complete. Utilization confirms that the locked rate has been consumed and associates the deal with the corresponding transaction. Each deal can only be utilized once — attempting to utilize a deal a second time returns `DEAL_ALREADY_UTILIZED`.
+
+## Endpoint
+
+```
+POST /fx/deals/{deal_id}/utilize
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Path Parameters
+
+<ParamField path="deal_id" type="string" required>
+  The unique identifier of the FX deal to utilize. This is the `deal_id` returned when the deal was booked via `POST /fx/deals`.
+</ParamField>
+
+## Request Body
+
+<ParamField body="transaction_id" type="string" required>
+  The `transaction_id` of the remittance transaction associated with this FX deal. This links the deal utilization to the specific funds transfer for reconciliation and audit purposes.
+</ParamField>
+
+<ParamField body="utilized_amount" type="number" required>
+  The amount in the deal's `from_currency` being utilized. This must be less than or equal to the deal's original `amount`. Partial utilization is supported — the remaining balance of the deal is forfeited and the deal status moves to `UTILIZED` regardless.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api-sandbox.fablefintech.com/v1/fx/deals/deal_01HZABCDE9876543210FGHIJ/utilize \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+    "utilized_amount": 1000.00
+  }'
+```
+
+## Response Fields
+
+<ResponseField name="deal_id" type="string">
+  The unique identifier of the FX deal that was utilized.
+</ResponseField>
+
+<ResponseField name="deal_status" type="string">
+  Updated status of the deal. Always `UTILIZED` after a successful utilization request.
+</ResponseField>
+
+<ResponseField name="utilized_at" type="string">
+  ISO 8601 timestamp of when the utilization was recorded.
+</ResponseField>
+
+<ResponseField name="transaction_id" type="string">
+  The transaction ID that was associated with this deal utilization, as provided in the request.
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "deal_id": "deal_01HZABCDE9876543210FGHIJ",
+  "deal_status": "UTILIZED",
+  "utilized_at": "2024-06-15T12:00:00Z",
+  "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX"
+}
+```
+
+## Error Codes
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `DEAL_NOT_FOUND` | 404 | No FX deal exists with the provided `deal_id`. Verify the ID and retry. |
+| `DEAL_EXPIRED` | 409 | The deal has passed its `expires_at` timestamp and can no longer be utilized. Book a new deal to proceed. |
+| `DEAL_ALREADY_UTILIZED` | 409 | The deal has already been successfully utilized and cannot be utilized again. Each deal supports a single utilization. |

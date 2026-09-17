@@ -1,0 +1,101 @@
+---
+title: "Fable Fintech REST API Overview"
+sidebarTitle: "Overview"
+description: "The Fable Fintech REST API provides endpoints for creating remittance transactions, booking FX deals, running compliance checks, and managing webhooks."
+---
+
+The Fable Fintech API is a REST API that returns JSON. Use it to programmatically create and manage remittance transactions, fetch live exchange rates, run KYC and AML compliance checks, and receive real-time event notifications via webhooks. All interactions happen over HTTPS, and every request must be authenticated with a valid API key.
+
+## Base URLs
+
+Use the sandbox environment for development and testing — it mirrors production behavior without moving real funds. Switch to the production base URL when you are ready to go live.
+
+<Note>
+  **Sandbox** — for development and testing only, no real funds are moved.
+
+  ```
+  https://api-sandbox.fablefintech.com/v1
+  ```
+</Note>
+
+<Note>
+  **Production** — for live transactions. Requires compliance approval before access is granted.
+
+  ```
+  https://api.fablefintech.com/v1
+  ```
+</Note>
+
+## Request Format
+
+Every request must include two headers: `Content-Type: application/json` to indicate that you are sending a JSON body, and `Authorization: Bearer <token>` carrying your API key.
+
+```bash
+curl https://api-sandbox.fablefintech.com/v1/transactions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+Requests that send a body (POST, PUT, PATCH) must serialize the payload as valid JSON. Query parameters are used for GET requests where noted.
+
+## Response Format
+
+All responses are JSON. Successful responses return the resource or list of resources at the top level of the response object. Error responses always wrap the error in an `error` object so you can reliably detect failures by checking for the presence of `error` in the response body.
+
+**Success response (example):**
+
+```json
+{
+  "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+  "status": "PENDING",
+  "amount": 1000.00
+}
+```
+
+**Error response:**
+
+```json
+{
+  "error": {
+    "code": "INVALID_CORRIDOR",
+    "message": "The specified corridor US-ZZ is not supported.",
+    "details": {
+      "corridor": "US-ZZ"
+    }
+  }
+}
+```
+
+## Versioning
+
+The current API version is **v1**. The version is specified as a path segment in every URL — for example, `/v1/transactions`. When breaking changes are introduced, a new version will be released alongside advance deprecation notice. Non-breaking additions (new fields, new event types) may be added to existing versions without a version bump.
+
+## Rate Limits
+
+Rate limits are enforced per API key. If you exceed the limit, the API returns `429 Too Many Requests`. The response includes a `Retry-After` header indicating the number of seconds to wait before retrying the request.
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 30
+```
+
+Design your integration to read the `Retry-After` value and back off accordingly. Avoid tight retry loops — repeated 429 responses do not reset the window.
+
+---
+
+## Explore the API
+
+<CardGroup cols={2}>
+  <Card title="Remittance" icon="money-bill-transfer" href="/api-reference/remittance/create-transaction">
+    Create, retrieve, cancel, and track cross-border remittance transactions.
+  </Card>
+  <Card title="FX & Rates" icon="chart-line" href="/api-reference/fx/get-rate">
+    Fetch live exchange rates and book locked FX deals for customers.
+  </Card>
+  <Card title="Compliance" icon="shield-check" href="/api-reference/compliance/kyc-verification">
+    Run KYC verification, AML screening, and sanctions checks.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/api-reference/webhooks/overview">
+    Register endpoints and receive real-time event notifications.
+  </Card>
+</CardGroup>

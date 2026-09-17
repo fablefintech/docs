@@ -1,0 +1,78 @@
+---
+title: "API Error Codes and Responses"
+sidebarTitle: "Errors"
+description: "Reference for all Fable Fintech API error codes, HTTP status codes, and guidance on handling each error type in your integration."
+---
+
+Fable uses standard HTTP status codes to communicate the outcome of every request and returns a structured error object in the response body whenever a request fails. Your integration should branch on the HTTP status code first, then inspect `error.code` for precise programmatic handling.
+
+## Error Response Format
+
+All error responses follow the same structure. The `error` object contains a machine-readable `code`, a human-readable `message`, and an optional `details` object with additional context specific to the error.
+
+```json
+{
+  "error": {
+    "code": "RATE_EXPIRED",
+    "message": "The rate_id provided has expired. Fetch a new rate before retrying.",
+    "details": {
+      "rate_id": "rate_01HZ8MKBNK3J2F4P8GRWSV7AAX",
+      "expired_at": "2024-06-15T10:32:00Z"
+    }
+  }
+}
+```
+
+The `details` field is present when additional context helps you resolve the issue — for example, identifying which field failed validation or which resource was not found. It may be an empty object `{}` for errors that require no additional context.
+
+## HTTP Status Codes
+
+| Status Code | Name | Description |
+|-------------|------|-------------|
+| `200` | OK | The request succeeded. The response body contains the requested resource or confirmation. |
+| `201` | Created | A new resource was successfully created. The response body contains the created resource. |
+| `204` | No Content | The request succeeded and there is no response body (used by DELETE endpoints). |
+| `400` | Bad Request | The request is malformed or contains invalid parameters. Check the `error.details` for which fields are affected. |
+| `401` | Unauthorized | The `Authorization` header is missing, malformed, or the API key is invalid. |
+| `403` | Forbidden | The API key is valid but does not have permission to perform this operation. |
+| `404` | Not Found | The requested resource does not exist. Verify the ID or path in your request. |
+| `409` | Conflict | The request conflicts with the current state of the resource — for example, a duplicate transaction or attempting to cancel a transaction that is already processing. |
+| `422` | Unprocessable Entity | The request is well-formed but the provided values fail business-logic validation. |
+| `429` | Too Many Requests | You have exceeded the rate limit for this API key. Wait for the `Retry-After` duration before retrying. |
+| `500` | Internal Server Error | An unexpected error occurred on Fable's servers. These are rare — if they persist, contact support with the request ID from the response headers. |
+
+## Application Error Codes
+
+These codes appear in `error.code` and allow you to handle specific failure scenarios programmatically.
+
+| Error Code | HTTP Status | Description |
+|------------|-------------|-------------|
+| `INVALID_CORRIDOR` | 400 | The specified corridor (e.g. `US-ZZ`) is not supported or not enabled for your account. |
+| `INVALID_CURRENCY` | 400 | One or more of the currency codes provided are not valid ISO 4217 codes or are not supported on the specified corridor. |
+| `RATE_EXPIRED` | 409 | The `rate_id` included in the request has passed its validity window. Fetch a fresh rate and retry. |
+| `KYC_REQUIRED` | 403 | The sender has not completed KYC verification. Submit a KYC request before initiating a transaction. |
+| `COMPLIANCE_HOLD` | 403 | The transaction or customer has been placed on a compliance hold pending manual review. |
+| `INSUFFICIENT_FUNDS` | 422 | The source account or wallet does not have sufficient funds to complete the transaction. |
+| `DUPLICATE_TRANSACTION` | 409 | A transaction with the same `reference` ID already exists. Use a unique reference or omit the field to let Fable generate one. |
+| `TRANSACTION_NOT_FOUND` | 404 | No transaction exists with the provided ID. |
+| `CANNOT_CANCEL` | 409 | The transaction cannot be cancelled because it has already entered or completed the processing stage. |
+| `DEAL_NOT_FOUND` | 404 | No FX deal exists with the provided `deal_id`. |
+| `DEAL_EXPIRED` | 409 | The FX deal has passed its expiry window and can no longer be utilized. |
+| `DEAL_ALREADY_UTILIZED` | 409 | The FX deal has already been marked as utilized and cannot be utilized again. |
+
+## Retry Guidance
+
+Not all errors are worth retrying. Retrying a non-retryable error without fixing the underlying cause will produce the same failure and waste your rate limit quota.
+
+**Retryable errors** are generally caused by transient conditions:
+
+- `5xx` errors — temporary server-side issues. Retry with exponential backoff, starting at 1 second and capping at 60 seconds. After 5 failed attempts, surface the error to the operator.
+- `429 Too Many Requests` — rate limit exceeded. Read the `Retry-After` header and wait exactly that many seconds before retrying.
+- `RATE_EXPIRED` (409) — fetch a fresh rate from `GET /fx/rates` and resubmit the request with the new `rate_id`.
+
+**Non-retryable errors** indicate a problem with your request that will not resolve itself:
+
+- `4xx` errors (except `401`, `429`) — the request is invalid. Fix the request before retrying. Check `error.code` and `error.details` for specific guidance.
+- `401 Unauthorized` — your API key is missing or invalid. Verify credentials before retrying.
+- `DUPLICATE_TRANSACTION` — change or omit the `reference` field before retrying.
+- `KYC_REQUIRED` / `COMPLIANCE_HOLD` — complete the required compliance step through the appropriate endpoint before retrying the transaction.

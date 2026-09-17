@@ -1,0 +1,167 @@
+---
+title: "Book and Utilize FX Deals with DigiBureau"
+sidebarTitle: "FX Deal Booking"
+description: "Learn how to book FX deals, lock exchange rates, and mark deals as utilized using DigiBureau's deal management API."
+---
+
+DigiBureau enables banks and financial institutions to offer locked FX rates for cross-border transactions — customers book a deal at the current market rate and utilize it when the corresponding funds transfer is executed. This decoupling of rate locking from payment execution gives your customers certainty over the exchange rate they will receive, and gives your operations team time to process the underlying transfer. This guide walks you through the complete deal lifecycle from fetching a live rate to marking a deal as utilized.
+
+<Steps>
+  <Step title="Fetch Live Rate">
+    Start by fetching the current exchange rate for your currency pair. The `rate_id` and `valid_until` timestamp from this response are required to book a deal.
+
+    ```bash
+    curl --request GET \
+      --url "https://api-sandbox.fablefintech.com/v1/fx/rates?from=USD&to=INR" \
+      --header "Authorization: Bearer <your_api_key>"
+    ```
+
+    **Response:**
+
+    ```json
+    {
+      "rate_id": "RATE-20240115-XYZ789",
+      "from_currency": "USD",
+      "to_currency": "INR",
+      "rate": 83.42,
+      "valid_until": "2024-01-15T10:15:00Z",
+      "margin_included": true
+    }
+    ```
+
+    Note both the `rate_id` and the `valid_until` timestamp. You must book the deal before `valid_until` — if the rate expires, fetch a fresh one and start again. The deal validity period (how long the customer has to utilize the deal after booking) is configured separately and is typically much longer than the initial rate validity window.
+  </Step>
+
+  <Step title="Book the Deal">
+    Call `POST /fx/deals` with the `rate_id`, currency pair, amount, and customer details. Use the `deal_type` field to categorize the deal by customer segment (see **Deal Types** below).
+
+    ```bash
+    curl --request POST \
+      --url "https://api-sandbox.fablefintech.com/v1/fx/deals" \
+      --header "Authorization: Bearer <your_api_key>" \
+      --header "Content-Type: application/json" \
+      --data '{
+        "rate_id": "RATE-20240115-XYZ789",
+        "from_currency": "USD",
+        "to_currency": "INR",
+        "amount": 10000.00,
+        "customer_id": "CUST-001",
+        "deal_type": "INDIVIDUAL"
+      }'
+    ```
+
+    **Response:**
+
+    ```json
+    {
+      "deal_id": "DEAL-20240115-DEF456",
+      "deal_status": "BOOKED",
+      "rate_id": "RATE-20240115-XYZ789",
+      "from_currency": "USD",
+      "to_currency": "INR",
+      "locked_rate": 83.42,
+      "amount": 10000.00,
+      "destination_amount": 834200.00,
+      "customer_id": "CUST-001",
+      "deal_type": "INDIVIDUAL",
+      "booked_at": "2024-01-15T10:02:00Z",
+      "expires_at": "2024-01-15T22:02:00Z"
+    }
+    ```
+
+    Store the `deal_id` and `expires_at` values. The `deal_id` is referenced when creating the associated transaction, and `expires_at` determines the deadline by which the customer must confirm and the transfer must be initiated.
+  </Step>
+
+  <Step title="Present Deal to Customer">
+    Display the booked deal details to your customer so they can confirm or decline before the transfer is initiated.
+
+    Key information to present:
+
+    - **Locked exchange rate** — `locked_rate` (e.g., 1 USD = 83.42 INR)
+    - **Amount to send** — `amount` in `from_currency`
+    - **Amount recipient receives** — `destination_amount` in `to_currency`
+    - **Deal expiry** — `expires_at` formatted in the customer's local timezone
+    - **Deal reference** — `deal_id` for customer support purposes
+
+    Your UI should make the expiry time prominent and provide a countdown if your product requires customer confirmation before the transfer is executed. If the customer declines, no further action is required — the deal will expire automatically.
+  </Step>
+
+  <Step title="Initiate Transfer">
+    Once the customer confirms, create the remittance transaction and reference the `deal_id` to associate it with the locked rate. Include the `deal_id` in the transaction payload instead of a `rate_id`.
+
+    ```bash
+    curl --request POST \
+      --url "https://api-sandbox.fablefintech.com/v1/transactions" \
+      --header "Authorization: Bearer <your_api_key>" \
+      --header "Content-Type: application/json" \
+      --data '{
+        "sender": {
+          "customer_id": "CUST-001",
+          "full_name": "Jane Doe",
+          "country": "US"
+        },
+        "receiver": {
+          "full_name": "Ravi Kumar",
+          "account_number": "9876543210",
+          "bank_code": "SBIN0001234",
+          "country": "IN"
+        },
+        "amount": 10000.00,
+        "source_currency": "USD",
+        "destination_currency": "INR",
+        "corridor": "US-IN",
+        "channel": "BANK_TRANSFER",
+        "deal_id": "DEAL-20240115-DEF456",
+        "purpose": "INVESTMENT"
+      }'
+    ```
+
+    The transaction will use the locked rate from the deal rather than the live market rate at the time of submission.
+  </Step>
+
+  <Step title="Mark Deal Utilized">
+    After the funds transfer is confirmed and the transaction reaches `DELIVERED` status, mark the deal as utilized by calling `POST /fx/deals/{deal_id}/utilize`. This closes the deal and updates your reconciliation records.
+
+    ```bash
+    curl --request POST \
+      --url "https://api-sandbox.fablefintech.com/v1/fx/deals/DEAL-20240115-DEF456/utilize" \
+      --header "Authorization: Bearer <your_api_key>" \
+      --header "Content-Type: application/json" \
+      --data '{
+        "transaction_id": "TXN-20240115-ABC123",
+        "utilized_amount": 10000.00,
+        "utilized_at": "2024-01-15T14:30:00Z"
+      }'
+    ```
+
+    **Response:**
+
+    ```json
+    {
+      "deal_id": "DEAL-20240115-DEF456",
+      "deal_status": "UTILIZED",
+      "transaction_id": "TXN-20240115-ABC123",
+      "utilized_amount": 10000.00,
+      "utilized_at": "2024-01-15T14:30:00Z"
+    }
+    ```
+
+    Once a deal is marked `UTILIZED`, it cannot be utilized again. Partial utilization is supported for `CORPORATE` and `PARTNER_BANK` deal types — provide the `utilized_amount` accordingly and the remaining deal balance is updated.
+  </Step>
+</Steps>
+
+## Deal Types
+
+Use the `deal_type` field to classify deals by customer segment. The appropriate type determines applicable limits, approval workflows, and reporting categories.
+
+| Deal Type | Use Case |
+|---|---|
+| `INDIVIDUAL` | Retail customers sending personal remittances or cross-border payments |
+| `CORPORATE` | Business customers executing supplier payments, payroll, or treasury transfers |
+| `PARTNER_BANK` | Correspondent bank or partner financial institution transactions |
+
+Ensure you select the correct `deal_type` for each booking — misclassification may trigger incorrect compliance workflows or reporting entries.
+
+<Tip>
+  Unused deals expire automatically after the configured validity period (shown in `expires_at`). Always handle deal expiry gracefully in your UI — display a clear expiry countdown, notify the customer before expiry, and provide an easy path to re-book at the current rate if the deal lapses.
+</Tip>

@@ -1,0 +1,97 @@
+---
+title: "Onboarding to Fable Fintech: From Sandbox to Production"
+sidebarTitle: "Onboarding"
+description: "Learn the complete onboarding process for Fable Fintech — from sandbox access request through compliance review to production go-live."
+---
+
+Fable Fintech's deployment process is purpose-built for a 30-day go-live, giving your engineering, compliance, and operations teams a structured path from first API call to live transactions. This guide walks you through every stage of that journey — from submitting your initial access request to flipping your integration to production credentials.
+
+<Steps>
+  <Step title="Request Access">
+    Submit the contact form at [fablefintech.com/contact](https://fablefintech.com/contact), including the following details:
+
+    - **Organization type** — bank, money transfer operator (MTO), exchange house, or SME
+    - **Target corridors** — the send/receive country pairs you intend to operate (e.g., US→IN, GB→PH)
+    - **Products of interest** — DigiRemit, DigiForex, LastMile, BizPay, DigiBureau, Ex-Core, or a combination
+
+    A Fable account manager will review your request and reach out within one business day to schedule an onboarding call.
+  </Step>
+
+  <Step title="Sandbox Provisioning">
+    After the onboarding call, Fable provisions a dedicated sandbox environment for your organization. You will receive:
+
+    - A sandbox **API key** scoped to your organization
+    - The sandbox **base URL**: `https://api-sandbox.fablefintech.com/v1`
+    - Access to this documentation portal and the full API Reference
+
+    Typical turnaround for sandbox provisioning is **1–2 business days**. All requests to the sandbox must include your API key as a Bearer token in the `Authorization` header:
+
+    ```bash
+    Authorization: Bearer <your_sandbox_api_key>
+    ```
+  </Step>
+
+  <Step title="Integration Development">
+    Build and test your integration entirely within the sandbox environment. The sandbox mirrors production behavior — including compliance checks, FX rate feeds, and delivery channel routing — so issues caught here will not surface in production.
+
+    Resources available during this phase:
+
+    - **API Reference** — full endpoint documentation with request/response schemas
+    - **SDKs** — official client libraries for JavaScript, Python, and Java
+    - **Guide pages** — including this one, covering remittance flows, FX deal booking, bulk processing, and webhooks
+
+    Your assigned account manager provides technical support throughout the integration phase. Reach out via the shared Slack channel or email thread established during onboarding.
+  </Step>
+
+  <Step title="Compliance & KYC Setup">
+    Before you can process live transactions, your compliance configuration must be established in collaboration with Fable's compliance team. This includes:
+
+    - **KYC provider integration** — connect your identity verification provider or use Fable's built-in DigiBureau KYC module
+    - **AML screening rules** — configure transaction monitoring thresholds, velocity rules, and alert routing
+    - **Sanctions list management** — select the sanction lists to screen against (OFAC, UN, EU, HMT, and others)
+    - **Approval workflows** — configure 4-Eye or 6-Eye approval chains for high-value or high-risk transactions
+
+    Fable's compliance team will review your configuration and sign off before production access is granted.
+  </Step>
+
+  <Step title="Corridor & Channel Configuration">
+    Work with your Fable account manager to enable the specific corridors and delivery channels your customers will use. Configuration covers:
+
+    - **Corridors** — each send/receive country pair (e.g., US→IN, GB→IN, AE→PH) must be explicitly enabled
+    - **Delivery channels** — bank account transfer, mobile wallet, cash pickup, or LastMile agent network
+    - **Currency pairs** — FX pairs available within each corridor
+    - **Transaction limits** — per-transaction and daily limits per corridor, aligned with your regulatory obligations
+
+    Corridor enablement may require additional regulatory documentation depending on your licensing and the jurisdictions involved.
+  </Step>
+
+  <Step title="UAT (User Acceptance Testing)">
+    Once your integration is complete and compliance configuration is in place, you will run a formal User Acceptance Testing (UAT) phase in the sandbox. Fable provides a **UAT testing checklist** covering:
+
+    - Successful end-to-end remittance flows across each enabled corridor
+    - KYC approval and rejection scenarios
+    - AML and sanctions screening outcomes
+    - FX rate fetching, deal booking, and deal utilization
+    - Webhook delivery and signature verification
+    - Error handling and retry behavior for failed transactions
+
+    UAT sign-off from both your team and Fable's technical team is required before production credentials are issued.
+  </Step>
+
+  <Step title="Production Go-Live">
+    After UAT sign-off and compliance approval, Fable provisions your production credentials:
+
+    - A production **API key**
+    - The production **base URL**: `https://api.fablefintech.com/v1`
+
+    To go live, update your environment configuration to use the production base URL and API key. No other code changes are required — your sandbox integration is fully compatible with production.
+
+    <Note>
+      Production credentials are issued **only after** your compliance review is complete and signed off by Fable's compliance team. Attempting to use sandbox credentials against the production endpoint will result in authentication errors.
+    </Note>
+  </Step>
+</Steps>
+
+## Support
+
+If you have technical questions at any stage of the onboarding process, contact your Fable account manager directly or submit a query via [fablefintech.com/contact](https://fablefintech.com/contact). Include your organization name, sandbox API key (never your production key), and a description of the issue for the fastest response.

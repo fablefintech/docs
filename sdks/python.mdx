@@ -1,0 +1,217 @@
+---
+title: "Python SDK for Fable Fintech"
+sidebarTitle: "Python"
+description: "Install and use the Fable Fintech Python SDK to integrate cross-border remittance, FX rates, and compliance checks into your Python application."
+---
+
+The `fable-fintech` Python library provides a synchronous and async-compatible client for the Fable API, with dataclass-based response models. Whether you're building a Django or FastAPI backend, a data pipeline, or a script-based batch processor, the library gives you typed responses, automatic retries, and structured exceptions without boilerplate.
+
+## Installation
+
+```bash
+pip install fable-fintech
+```
+
+The package requires Python 3.8 or later and has no mandatory third-party dependencies beyond the standard `httpx` transport layer.
+
+## Initialization
+
+Import `FableClient` and pass your API key and target environment. Store your API key in an environment variable rather than hard-coding it.
+
+```python
+from fable_fintech import FableClient
+
+client = FableClient(
+    api_key="your_api_key",
+    environment="sandbox"  # or "production"
+)
+```
+
+<Note>
+  Use `python-dotenv` or your platform's secrets management to keep your API key out of source control. Never commit credentials to version control.
+</Note>
+
+## Creating a Transaction
+
+Call `client.transactions.create()` with sender, receiver, and payment details. The method returns a `Transaction` dataclass with a `transaction_id` and initial `status`.
+
+```python
+transaction = client.transactions.create(
+    sender={"name": "John Doe", "country": "US", "currency": "USD"},
+    receiver={
+        "name": "Jane Smith",
+        "country": "IN",
+        "account_number": "123456789012",
+        "bank_code": "HDFC0001234",
+    },
+    amount=500.00,
+    source_currency="USD",
+    destination_currency="INR",
+    corridor="US-IN",
+    channel="BANK_TRANSFER",
+)
+
+print(transaction.transaction_id, transaction.status)
+# TXN-2024-ABCD1234  PENDING
+```
+
+## Fetching FX Rates
+
+Use `client.fx.get_rate()` to retrieve the live exchange rate for a currency pair. The `valid_until` field tells you when the quoted rate expires.
+
+```python
+rate = client.fx.get_rate(from_currency="USD", to_currency="INR")
+print(f"Rate: {rate.rate}, valid until: {rate.valid_until}")
+# Rate: 83.42, valid until: 2024-07-15T10:30:00Z
+```
+
+## Polling Transaction Status
+
+Check the current state of a transaction by calling `client.transactions.get_status()`.
+
+```python
+status = client.transactions.get_status(transaction.transaction_id)
+print(status.status)
+# PROCESSING
+```
+
+<Tip>
+  Instead of polling on a loop, register a webhook with `client.webhooks.register()` to receive push notifications when transaction status changes — this is more efficient and reduces latency.
+</Tip>
+
+## Booking and Utilizing an FX Deal
+
+Lock in a rate by booking an FX deal and referencing the deal ID when you create the transaction.
+
+```python
+# Book a deal to lock the current rate
+deal = client.fx.book_deal(
+    from_currency="USD",
+    to_currency="INR",
+    amount=500.00,
+    corridor="US-IN",
+)
+print(f"Deal: {deal.deal_id}, expires at: {deal.expires_at}")
+
+# Create the transaction referencing the booked deal
+transaction = client.transactions.create(
+    sender={"name": "John Doe", "country": "US", "currency": "USD"},
+    receiver={
+        "name": "Jane Smith",
+        "country": "IN",
+        "account_number": "123456789012",
+        "bank_code": "HDFC0001234",
+    },
+    amount=500.00,
+    source_currency="USD",
+    destination_currency="INR",
+    corridor="US-IN",
+    channel="BANK_TRANSFER",
+    fx_deal_id=deal.deal_id,
+)
+
+# Mark the deal as utilized once the transaction is confirmed
+client.fx.utilize_deal(deal.deal_id, transaction_id=transaction.transaction_id)
+```
+
+## KYC Submission
+
+Submit customer identity documents for KYC verification before their first transaction. The `status` field on the response will be `APPROVED`, `PENDING`, or `REJECTED`.
+
+```python
+result = client.compliance.submit_kyc(
+    customer_id="CUST-001",
+    full_name="John Doe",
+    date_of_birth="1990-01-15",
+    nationality="US",
+    id_type="PASSPORT",
+    id_number="A12345678",
+    id_expiry="2030-01-15",
+)
+print(result.status)  # APPROVED, PENDING, REJECTED
+```
+
+## AML Screening
+
+Run an AML screening check against a customer profile. The `risk_level` field returns `LOW`, `MEDIUM`, or `HIGH`.
+
+```python
+aml_result = client.compliance.run_aml_screening(
+    customer_id="CUST-001",
+    full_name="John Doe",
+    date_of_birth="1990-01-15",
+    nationality="US",
+)
+print(f"AML risk level: {aml_result.risk_level}")
+```
+
+## Registering a Webhook
+
+```python
+webhook = client.webhooks.register(
+    url="https://your-app.com/webhooks/fable",
+    events=["transaction.completed", "transaction.failed", "kyc.status_changed"],
+    secret="your_webhook_signing_secret",
+)
+print(webhook.webhook_id, webhook.status)
+```
+
+## Error Handling
+
+The SDK raises `FableApiError` for any non-2xx API response. The exception carries a structured `code`, `message`, `http_status`, and `request_id`.
+
+```python
+from fable_fintech.exceptions import FableApiError
+
+try:
+    transaction = client.transactions.create(**payload)
+except FableApiError as e:
+    print(f"Error {e.code}: {e.message}")
+    print(f"HTTP status: {e.http_status}")
+    print(f"Request ID: {e.request_id}")
+```
+
+Common error codes you may encounter:
+
+| Code | HTTP Status | Description |
+|---|---|---|
+| `INVALID_CORRIDOR` | 400 | The specified corridor is not supported. |
+| `KYC_REQUIRED` | 403 | Sender KYC must be completed before transacting. |
+| `DEAL_EXPIRED` | 409 | The referenced FX deal has expired. |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests — the SDK will retry automatically. |
+| `INTERNAL_ERROR` | 500 | Unexpected server error — contact support with the `request_id`. |
+
+## Async Support
+
+For async frameworks such as FastAPI or `asyncio`-based applications, use `AsyncFableClient`. It exposes the same methods as the synchronous client but returns coroutines.
+
+```python
+import asyncio
+from fable_fintech import AsyncFableClient
+
+async def send_payment():
+    async with AsyncFableClient(api_key="your_api_key", environment="sandbox") as client:
+        rate = await client.fx.get_rate(from_currency="USD", to_currency="INR")
+        print(f"Rate: {rate.rate}")
+
+        transaction = await client.transactions.create(
+            sender={"name": "John Doe", "country": "US", "currency": "USD"},
+            receiver={
+                "name": "Jane Smith",
+                "country": "IN",
+                "account_number": "123456789012",
+                "bank_code": "HDFC0001234",
+            },
+            amount=500.00,
+            source_currency="USD",
+            destination_currency="INR",
+            corridor="US-IN",
+            channel="BANK_TRANSFER",
+        )
+        return transaction
+
+transaction = asyncio.run(send_payment())
+print(transaction.transaction_id)
+```
+
+`AsyncFableClient` uses `httpx.AsyncClient` under the hood and is safe to use with all async web frameworks including FastAPI, Starlette, and aiohttp-based apps.

@@ -1,0 +1,78 @@
+---
+title: "GET /transactions/{id}/status — Transaction Status"
+sidebarTitle: "Transaction Status"
+description: "GET /transactions/{id}/status — returns the current status of a transaction. Use for polling; prefer webhooks for production integrations."
+---
+
+Fetch the current status of a transaction using its ID. This endpoint returns a lightweight response containing only the status and timestamps — use `GET /transactions/{id}` if you need the full transaction details. For production integrations, consider subscribing to the `transaction.status_changed` webhook event to receive real-time updates without polling.
+
+## Endpoint
+
+```
+GET /transactions/{transaction_id}/status
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Path Parameters
+
+<ParamField path="transaction_id" type="string" required>
+  The unique identifier of the transaction whose status you want to retrieve.
+</ParamField>
+
+## Response Fields
+
+<ResponseField name="transaction_id" type="string">
+  The unique identifier of the transaction.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The current status of the transaction. See the status values table below for all possible states and their meanings.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp of the last time the transaction status changed.
+</ResponseField>
+
+## Status Values
+
+| Status | Description | Terminal |
+|--------|-------------|----------|
+| `PENDING` | Transaction has been created and is awaiting compliance screening. | No |
+| `SCREENING` | The transaction is being processed through AML and sanctions screening. | No |
+| `AWAITING_APPROVAL` | Screening is complete but the transaction requires manual approval before processing. | No |
+| `PROCESSING` | Funds movement has begun. The transaction cannot be cancelled at this stage. | No |
+| `IN_TRANSIT` | Funds have left the source and are in transit to the destination institution. | No |
+| `DELIVERED` | Funds have been confirmed as received by the destination institution or beneficiary. | No |
+| `SETTLED` | The transaction has been fully settled and reconciled. | Yes |
+| `FAILED` | The transaction failed during processing. See `failure_reason` on the full transaction record. | Yes |
+| `CANCELLED` | The transaction was cancelled before processing began. | Yes |
+
+Terminal statuses (`SETTLED`, `FAILED`, `CANCELLED`) are final — once a transaction reaches a terminal status, it will not change again. You can stop polling once you receive any terminal status.
+
+## Example Request
+
+```bash
+curl https://api-sandbox.fablefintech.com/v1/transactions/txn_01HZ9QKBNK3J2F4P8GRWSV7MEX/status \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json"
+```
+
+## Example Response
+
+```json
+{
+  "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+  "status": "IN_TRANSIT",
+  "updated_at": "2024-06-15T11:05:00Z"
+}
+```
+
+<Tip>
+  Use the `transaction.status_changed` webhook event for real-time status updates in production. Webhooks push updates to your endpoint as soon as a status change occurs, eliminating the need to poll and reducing latency significantly. See the [Webhooks Overview](/api-reference/webhooks/overview) for setup instructions.
+</Tip>

@@ -1,0 +1,123 @@
+---
+title: "POST /compliance/sanctions — Run Sanctions Check"
+sidebarTitle: "Sanctions Check"
+description: "POST /compliance/sanctions — checks a name or entity against OFAC, UN, EU, and other sanctions lists, returning match status and details."
+---
+
+Perform a real-time sanctions check against major international sanctions lists before processing a transaction. This endpoint screens the provided name and country against the OFAC SDN list, UN Security Council consolidated list, EU consolidated sanctions list, and other applicable databases. You should run a sanctions check for both the sender and receiver before initiating a remittance.
+
+## Endpoint
+
+```
+POST /compliance/sanctions
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Full name of the individual or organization to screen against sanctions lists.
+</ParamField>
+
+<ParamField body="country" type="string" required>
+  ISO 3166-1 alpha-2 country code associated with the individual or organization (e.g. `IR`, `KP`, `RU`).
+</ParamField>
+
+<ParamField body="date_of_birth" type="string">
+  Date of birth of the individual in ISO 8601 date format (e.g. `1960-07-15`). Providing this field significantly improves the precision of the match and reduces false positives. Applicable only when `entity_type` is `INDIVIDUAL`.
+</ParamField>
+
+<ParamField body="entity_type" type="string" required>
+  The type of entity being screened. One of:
+  - `INDIVIDUAL` — a natural person.
+  - `ORGANIZATION` — a business, government body, or other legal entity.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api-sandbox.fablefintech.com/v1/compliance/sanctions \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Rohan Sharma",
+    "country": "IN",
+    "date_of_birth": "1990-05-12",
+    "entity_type": "INDIVIDUAL"
+  }'
+```
+
+## Response Fields
+
+<ResponseField name="check_id" type="string">
+  Unique identifier for this sanctions check result. Retain this ID for your compliance audit trail.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The result of the sanctions check. One of:
+  - `CLEAR` — no matches found on any checked list.
+  - `POSSIBLE_MATCH` — one or more low-confidence matches found. Manual review is recommended before proceeding.
+  - `MATCH` — a high-confidence match was found on a sanctions list. The transaction is automatically blocked.
+</ResponseField>
+
+<ResponseField name="lists_checked" type="array">
+  An array of strings naming the sanctions lists that were checked during this request. Common values include `OFAC`, `UN`, and `EU`.
+</ResponseField>
+
+<ResponseField name="matches" type="array">
+  An array of match objects for any hits found. Empty when `status` is `CLEAR`.
+
+  <Expandable title="match object fields">
+    <ResponseField name="list" type="string">
+      The sanctions list on which the match was found (e.g. `OFAC`, `UN`, `EU`).
+    </ResponseField>
+    <ResponseField name="matched_name" type="string">
+      The name of the sanctioned individual or entity as it appears on the list.
+    </ResponseField>
+    <ResponseField name="match_score" type="number">
+      Confidence score for this match, between 0 and 100. Scores above 90 are treated as confirmed matches.
+    </ResponseField>
+    <ResponseField name="designation" type="string">
+      The reason for the sanctions designation, as recorded on the source list (e.g. `Terrorism Financing`, `Weapons Proliferation`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "check_id": "sanc_01HZCHK9876543210ABCDEFG",
+  "status": "CLEAR",
+  "lists_checked": ["OFAC", "UN", "EU"],
+  "matches": []
+}
+```
+
+**Example response with a match:**
+
+```json
+{
+  "check_id": "sanc_01HZCHK9876543210HIJKLMN",
+  "status": "MATCH",
+  "lists_checked": ["OFAC", "UN", "EU"],
+  "matches": [
+    {
+      "list": "OFAC",
+      "matched_name": "Rohan Kumar Sharma",
+      "match_score": 96,
+      "designation": "Terrorism Financing"
+    }
+  ]
+}
+```
+
+<Warning>
+  A `MATCH` status **automatically blocks the associated transaction** and places a compliance hold on the customer account. You must not attempt to retry or circumvent a sanctions match. Under applicable law, processing a transaction involving a sanctioned individual or entity may result in severe civil or criminal penalties. Contact Fable's compliance team immediately if you receive an unexpected `MATCH` result that you believe to be a false positive.
+</Warning>

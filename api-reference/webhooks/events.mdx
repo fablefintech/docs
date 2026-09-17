@@ -1,0 +1,293 @@
+---
+title: "Webhook Event Types Reference"
+sidebarTitle: "Event Types"
+description: "Complete reference for all Fable Fintech webhook events — transaction status changes, compliance updates, and delivery confirmations."
+---
+
+This page lists every webhook event that Fable can emit, including when each event fires and the complete JSON payload schema. Subscribe to specific events when registering your webhook endpoint, or use `["*"]` to receive all events. Use the `event` field in every payload to route events to the correct handler in your application.
+
+<Note>
+  Every webhook payload includes a top-level `event` field containing the event type string (e.g. `"transaction.status_changed"`). Route all incoming webhooks through a single handler that branches on this field rather than registering a separate endpoint per event type.
+</Note>
+
+## Transaction Events
+
+<AccordionGroup>
+
+<Accordion title="transaction.created">
+
+**When it fires:** Immediately after a new transaction is successfully created via `POST /transactions`.
+
+Use this event to trigger downstream workflows that need to react as soon as a transaction enters the system — for example, sending a confirmation notification to your customer.
+
+**Payload schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | Always `transaction.created`. |
+| `event_id` | string | Unique identifier for this event delivery. Use for deduplication. |
+| `timestamp` | string | ISO 8601 timestamp of when the event was generated. |
+| `data.transaction_id` | string | Unique identifier of the created transaction. |
+| `data.status` | string | Always `PENDING` for this event. |
+| `data.amount` | number | Source amount. |
+| `data.source_currency` | string | ISO 4217 source currency code. |
+| `data.destination_currency` | string | ISO 4217 destination currency code. |
+| `data.corridor` | string | The send-receive corridor (e.g. `US-IN`). |
+| `data.reference` | string | Your internal reference, if provided. |
+| `data.created_at` | string | ISO 8601 creation timestamp. |
+
+**Example payload:**
+
+```json
+{
+  "event": "transaction.created",
+  "event_id": "evt_01HZE001ABCDE1234567890AB",
+  "timestamp": "2024-06-15T10:30:01Z",
+  "data": {
+    "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+    "status": "PENDING",
+    "amount": 1000.00,
+    "source_currency": "USD",
+    "destination_currency": "INR",
+    "corridor": "US-IN",
+    "reference": "order_20240615_001",
+    "created_at": "2024-06-15T10:30:00Z"
+  }
+}
+```
+
+</Accordion>
+
+<Accordion title="transaction.status_changed">
+
+**When it fires:** Every time a transaction moves from one status to another — for example, from `PENDING` to `SCREENING`, or from `IN_TRANSIT` to `DELIVERED`.
+
+This is the most important event for tracking transaction progress. Subscribe to this event to keep your internal records and customer-facing UI in sync with the live transaction state. Both `old_status` and `new_status` are included so you can act on specific transitions without maintaining local state.
+
+**Payload schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | Always `transaction.status_changed`. |
+| `event_id` | string | Unique identifier for this event delivery. |
+| `timestamp` | string | ISO 8601 timestamp of when the status change occurred. |
+| `data.transaction_id` | string | Unique identifier of the transaction. |
+| `data.old_status` | string | The previous status before the change. |
+| `data.new_status` | string | The new current status after the change. |
+| `data.updated_at` | string | ISO 8601 timestamp of the status change. |
+
+**Example payload:**
+
+```json
+{
+  "event": "transaction.status_changed",
+  "event_id": "evt_01HZE002BCDEF2345678901BC",
+  "timestamp": "2024-06-15T10:45:00Z",
+  "data": {
+    "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+    "old_status": "SCREENING",
+    "new_status": "PROCESSING",
+    "updated_at": "2024-06-15T10:45:00Z"
+  }
+}
+```
+
+</Accordion>
+
+<Accordion title="transaction.delivered">
+
+**When it fires:** When the destination institution confirms that funds have been credited to the receiver's account or wallet. This signals that the transaction has reached the `DELIVERED` status.
+
+Use this event to notify your customer that their transfer was successful and to trigger any post-delivery actions in your system such as order fulfillment or receipt generation.
+
+**Payload schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | Always `transaction.delivered`. |
+| `event_id` | string | Unique identifier for this event delivery. |
+| `timestamp` | string | ISO 8601 timestamp of when the event was generated. |
+| `data.transaction_id` | string | Unique identifier of the delivered transaction. |
+| `data.status` | string | Always `DELIVERED`. |
+| `data.destination_amount` | number | Amount credited to the receiver in the destination currency. |
+| `data.destination_currency` | string | ISO 4217 code of the delivered currency. |
+| `data.delivered_at` | string | ISO 8601 timestamp of confirmed delivery. |
+| `data.reference` | string | Your internal reference, if provided. |
+
+**Example payload:**
+
+```json
+{
+  "event": "transaction.delivered",
+  "event_id": "evt_01HZE003CDEFG3456789012CD",
+  "timestamp": "2024-06-15T12:48:01Z",
+  "data": {
+    "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+    "status": "DELIVERED",
+    "destination_amount": 83420.00,
+    "destination_currency": "INR",
+    "delivered_at": "2024-06-15T12:48:00Z",
+    "reference": "order_20240615_001"
+  }
+}
+```
+
+</Accordion>
+
+<Accordion title="transaction.failed">
+
+**When it fires:** When a transaction cannot be completed and has moved to the terminal `FAILED` status. The payload includes a `failure_reason` field explaining the cause.
+
+Use this event to alert your operations team, trigger a customer notification, and — if the failure is retriable — initiate your retry flow.
+
+**Payload schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | Always `transaction.failed`. |
+| `event_id` | string | Unique identifier for this event delivery. |
+| `timestamp` | string | ISO 8601 timestamp of when the failure was recorded. |
+| `data.transaction_id` | string | Unique identifier of the failed transaction. |
+| `data.status` | string | Always `FAILED`. |
+| `data.failure_reason` | string | Human-readable description of why the transaction failed (e.g. `"Beneficiary account not found"`, `"Corridor temporarily unavailable"`). |
+| `data.failed_at` | string | ISO 8601 timestamp of when the failure occurred. |
+| `data.reference` | string | Your internal reference, if provided. |
+
+**Example payload:**
+
+```json
+{
+  "event": "transaction.failed",
+  "event_id": "evt_01HZE004DEFGH456789013DE",
+  "timestamp": "2024-06-15T13:10:00Z",
+  "data": {
+    "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+    "status": "FAILED",
+    "failure_reason": "Beneficiary account not found at destination bank.",
+    "failed_at": "2024-06-15T13:10:00Z",
+    "reference": "order_20240615_001"
+  }
+}
+```
+
+</Accordion>
+
+<Accordion title="transaction.cancelled">
+
+**When it fires:** When a transaction is successfully cancelled via `DELETE /transactions/{transaction_id}`, transitioning to the terminal `CANCELLED` status.
+
+**Payload schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | Always `transaction.cancelled`. |
+| `event_id` | string | Unique identifier for this event delivery. |
+| `timestamp` | string | ISO 8601 timestamp of when the event was generated. |
+| `data.transaction_id` | string | Unique identifier of the cancelled transaction. |
+| `data.status` | string | Always `CANCELLED`. |
+| `data.cancelled_at` | string | ISO 8601 timestamp of the cancellation. |
+| `data.reference` | string | Your internal reference, if provided. |
+
+**Example payload:**
+
+```json
+{
+  "event": "transaction.cancelled",
+  "event_id": "evt_01HZE005EFGHI567890134EF",
+  "timestamp": "2024-06-15T10:35:00Z",
+  "data": {
+    "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+    "status": "CANCELLED",
+    "cancelled_at": "2024-06-15T10:35:00Z",
+    "reference": "order_20240615_001"
+  }
+}
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+## Compliance Events
+
+<AccordionGroup>
+
+<Accordion title="compliance.kyc_completed">
+
+**When it fires:** When a KYC verification request submitted via `POST /compliance/kyc` reaches a terminal status: `APPROVED`, `REJECTED`, or `REVIEW_REQUIRED`. This event does not fire while the verification is still `PENDING`.
+
+Use this event to gate transaction initiation — wait for an `APPROVED` status before allowing your customer to proceed with a remittance.
+
+**Payload schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | Always `compliance.kyc_completed`. |
+| `event_id` | string | Unique identifier for this event delivery. |
+| `timestamp` | string | ISO 8601 timestamp of when the verification completed. |
+| `data.verification_id` | string | Unique identifier of the KYC verification. |
+| `data.customer_id` | string | Your customer ID associated with the verification. |
+| `data.status` | string | `APPROVED`, `REJECTED`, or `REVIEW_REQUIRED`. |
+| `data.completed_at` | string | ISO 8601 timestamp of when the check concluded. |
+
+**Example payload:**
+
+```json
+{
+  "event": "compliance.kyc_completed",
+  "event_id": "evt_01HZE006FGHIJ678901245FG",
+  "timestamp": "2024-06-15T10:40:00Z",
+  "data": {
+    "verification_id": "kyc_01HZXYZ9876543210ABCDEFG",
+    "customer_id": "cust_01HZ7ABCDE1234567890ABCD",
+    "status": "APPROVED",
+    "completed_at": "2024-06-15T10:40:00Z"
+  }
+}
+```
+
+</Accordion>
+
+<Accordion title="compliance.screening_completed">
+
+**When it fires:** When an AML or sanctions screening request reaches a final determination — `CLEAR`, `FLAGGED`, `MATCH`, or `REVIEW_REQUIRED`. This event covers both AML screenings (`POST /compliance/aml`) and sanctions checks (`POST /compliance/sanctions`).
+
+Use this event to update your compliance workflow and — where status is `CLEAR` — to unblock any downstream processing that was waiting for the screening result.
+
+**Payload schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | Always `compliance.screening_completed`. |
+| `event_id` | string | Unique identifier for this event delivery. |
+| `timestamp` | string | ISO 8601 timestamp of when the screening completed. |
+| `data.screening_id` | string | Unique identifier of the screening result. |
+| `data.screening_type` | string | The type of screening that completed: `AML` or `SANCTIONS`. |
+| `data.customer_id` | string | Your customer ID associated with this screening. |
+| `data.transaction_id` | string | Associated transaction ID, if the screening was linked to a transaction. |
+| `data.status` | string | `CLEAR`, `FLAGGED`, `MATCH`, or `REVIEW_REQUIRED`. |
+| `data.risk_score` | number | Risk score from 0–100 (present for AML screenings). |
+| `data.completed_at` | string | ISO 8601 timestamp of when the screening concluded. |
+
+**Example payload:**
+
+```json
+{
+  "event": "compliance.screening_completed",
+  "event_id": "evt_01HZE007GHIJK789012356GH",
+  "timestamp": "2024-06-15T10:43:00Z",
+  "data": {
+    "screening_id": "aml_01HZSCR9876543210ABCDEFG",
+    "screening_type": "AML",
+    "customer_id": "cust_01HZ7ABCDE1234567890ABCD",
+    "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+    "status": "CLEAR",
+    "risk_score": 4,
+    "completed_at": "2024-06-15T10:43:00Z"
+  }
+}
+```
+
+</Accordion>
+
+</AccordionGroup>

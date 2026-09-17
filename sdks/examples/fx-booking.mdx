@@ -1,0 +1,273 @@
+---
+title: "Code Example: FX Deal Booking with DigiBureau"
+sidebarTitle: "FX Booking"
+description: "End-to-end code examples for booking and utilizing FX deals with DigiBureau using the Fable Fintech SDK in JavaScript, Python, and Java."
+---
+
+These examples demonstrate the complete FX deal booking flow: fetch live rate → book deal → link to transaction → mark utilized. Booking an FX deal through DigiBureau lets you lock in the exchange rate at quote time, protecting your customers from rate slippage between initiation and settlement.
+
+<Note>
+  Always check the `expires_at` timestamp on a booked deal before you attempt to utilize it. FX deals expire after a short window (typically 30–120 seconds depending on your agreement). If the deal has expired, book a fresh deal before creating the transaction.
+</Note>
+
+<CodeGroup>
+
+```typescript JavaScript
+import { FableClient, FableApiError } from '@fable-fintech/sdk';
+
+const fable = new FableClient({
+  apiKey: process.env.FABLE_API_KEY,
+  environment: 'sandbox',
+});
+
+async function bookAndUtilizeFxDeal() {
+  // Step 1: Fetch the live indicative rate
+  const indicativeRate = await fable.fx.getRate({ from: 'USD', to: 'INR' });
+  console.log(
+    `Indicative rate: ${indicativeRate.rate} USD/INR ` +
+    `(valid until ${indicativeRate.valid_until})`
+  );
+
+  // Step 2: Book a firm FX deal to lock in the rate
+  const deal = await fable.fx.bookDeal({
+    from: 'USD',
+    to: 'INR',
+    amount: 500,
+    corridor: 'US-IN',
+  });
+
+  console.log(`Deal booked: ${deal.deal_id}`);
+  console.log(`Locked rate: ${deal.locked_rate}`);
+  console.log(`Destination amount: ${deal.destination_amount} INR`);
+  console.log(`Deal expires at: ${deal.expires_at}`);
+
+  // Step 3: Validate the deal has not expired before proceeding
+  const expiresAt = new Date(deal.expires_at);
+  if (expiresAt <= new Date()) {
+    throw new Error(`Deal ${deal.deal_id} has already expired. Book a new deal.`);
+  }
+
+  // Step 4: Create the transaction, referencing the booked deal
+  const transaction = await fable.transactions.create({
+    sender: { name: 'John Doe', country: 'US', currency: 'USD' },
+    receiver: {
+      name: 'Jane Smith',
+      country: 'IN',
+      account_number: '123456789012',
+      bank_code: 'HDFC0001234',
+    },
+    amount: 500,
+    source_currency: 'USD',
+    destination_currency: 'INR',
+    corridor: 'US-IN',
+    channel: 'BANK_TRANSFER',
+    fx_deal_id: deal.deal_id,
+  });
+
+  console.log(`Transaction created: ${transaction.transaction_id}`);
+
+  // Step 5: Mark the deal as utilized — this finalizes the rate lock
+  await fable.fx.utilizeDeal(deal.deal_id, {
+    transaction_id: transaction.transaction_id,
+  });
+
+  console.log(`Deal ${deal.deal_id} marked as utilized.`);
+  return { deal, transaction };
+}
+
+bookAndUtilizeFxDeal().catch((err) => {
+  if (err instanceof FableApiError) {
+    console.error(`Fable API error [${err.code}]: ${err.message}`);
+  } else {
+    console.error(err);
+  }
+});
+```
+
+```python Python
+from datetime import datetime, timezone
+from fable_fintech import FableClient
+from fable_fintech.exceptions import FableApiError
+
+client = FableClient(
+    api_key="your_sandbox_api_key",
+    environment="sandbox",
+)
+
+
+def book_and_utilize_fx_deal():
+    # Step 1: Fetch the live indicative rate
+    indicative_rate = client.fx.get_rate(from_currency="USD", to_currency="INR")
+    print(
+        f"Indicative rate: {indicative_rate.rate} USD/INR "
+        f"(valid until {indicative_rate.valid_until})"
+    )
+
+    # Step 2: Book a firm FX deal to lock in the rate
+    deal = client.fx.book_deal(
+        from_currency="USD",
+        to_currency="INR",
+        amount=500.00,
+        corridor="US-IN",
+    )
+
+    print(f"Deal booked: {deal.deal_id}")
+    print(f"Locked rate: {deal.locked_rate}")
+    print(f"Destination amount: {deal.destination_amount} INR")
+    print(f"Deal expires at: {deal.expires_at}")
+
+    # Step 3: Validate the deal has not expired before proceeding
+    expires_at = datetime.fromisoformat(deal.expires_at.replace("Z", "+00:00"))
+    if expires_at <= datetime.now(timezone.utc):
+        raise ValueError(
+            f"Deal {deal.deal_id} has already expired. Book a new deal."
+        )
+
+    # Step 4: Create the transaction, referencing the booked deal
+    transaction = client.transactions.create(
+        sender={"name": "John Doe", "country": "US", "currency": "USD"},
+        receiver={
+            "name": "Jane Smith",
+            "country": "IN",
+            "account_number": "123456789012",
+            "bank_code": "HDFC0001234",
+        },
+        amount=500.00,
+        source_currency="USD",
+        destination_currency="INR",
+        corridor="US-IN",
+        channel="BANK_TRANSFER",
+        fx_deal_id=deal.deal_id,
+    )
+
+    print(f"Transaction created: {transaction.transaction_id}")
+
+    # Step 5: Mark the deal as utilized — this finalizes the rate lock
+    client.fx.utilize_deal(deal.deal_id, transaction_id=transaction.transaction_id)
+
+    print(f"Deal {deal.deal_id} marked as utilized.")
+    return deal, transaction
+
+
+if __name__ == "__main__":
+    try:
+        book_and_utilize_fx_deal()
+    except FableApiError as e:
+        print(f"Fable API error [{e.code}]: {e.message}")
+```
+
+```java Java
+import com.fablefintech.FableClient;
+import com.fablefintech.exception.FableApiException;
+import com.fablefintech.model.*;
+import java.math.BigDecimal;
+import java.time.Instant;
+
+public class FxDealBookingExample {
+
+    public static void main(String[] args) {
+        FableClient client = FableClient.builder()
+            .apiKey(System.getenv("FABLE_API_KEY"))
+            .environment(Environment.SANDBOX)
+            .build();
+
+        try {
+            bookAndUtilizeFxDeal(client);
+        } catch (FableApiException e) {
+            System.err.printf("Fable API error [%s]: %s%n", e.getCode(), e.getMessage());
+        }
+    }
+
+    static void bookAndUtilizeFxDeal(FableClient client) throws FableApiException {
+
+        // Step 1: Fetch the live indicative rate
+        FxRate indicativeRate = client.fx().getRate("USD", "INR");
+        System.out.printf("Indicative rate: %s USD/INR (valid until %s)%n",
+            indicativeRate.getRate(), indicativeRate.getValidUntil());
+
+        // Step 2: Book a firm FX deal to lock in the rate
+        BookDealRequest dealRequest = BookDealRequest.builder()
+            .fromCurrency("USD")
+            .toCurrency("INR")
+            .amount(BigDecimal.valueOf(500))
+            .corridor("US-IN")
+            .build();
+
+        FxDeal deal = client.fx().bookDeal(dealRequest);
+        System.out.printf("Deal booked: %s%n", deal.getDealId());
+        System.out.printf("Locked rate: %s%n", deal.getLockedRate());
+        System.out.printf("Destination amount: %s INR%n", deal.getDestinationAmount());
+        System.out.printf("Deal expires at: %s%n", deal.getExpiresAt());
+
+        // Step 3: Validate the deal has not expired before proceeding
+        Instant expiresAt = Instant.parse(deal.getExpiresAt());
+        if (expiresAt.isBefore(Instant.now())) {
+            throw new IllegalStateException(
+                "Deal " + deal.getDealId() + " has already expired. Book a new deal."
+            );
+        }
+
+        // Step 4: Create the transaction, referencing the booked deal
+        CreateTransactionRequest txRequest = CreateTransactionRequest.builder()
+            .sender(Sender.builder().name("John Doe").country("US").currency("USD").build())
+            .receiver(Receiver.builder()
+                .name("Jane Smith")
+                .country("IN")
+                .accountNumber("123456789012")
+                .bankCode("HDFC0001234")
+                .build())
+            .amount(BigDecimal.valueOf(500))
+            .sourceCurrency("USD")
+            .destinationCurrency("INR")
+            .corridor("US-IN")
+            .channel(Channel.BANK_TRANSFER)
+            .fxDealId(deal.getDealId())
+            .build();
+
+        Transaction transaction = client.transactions().create(txRequest);
+        System.out.println("Transaction created: " + transaction.getTransactionId());
+
+        // Step 5: Mark the deal as utilized — this finalizes the rate lock
+        UtilizeDealRequest utilizeRequest = UtilizeDealRequest.builder()
+            .transactionId(transaction.getTransactionId())
+            .build();
+        client.fx().utilizeDeal(deal.getDealId(), utilizeRequest);
+
+        System.out.println("Deal " + deal.getDealId() + " marked as utilized.");
+    }
+}
+```
+
+</CodeGroup>
+
+## Example Deal Booking Response
+
+When you call the book deal endpoint, the API returns a deal object containing the locked rate and the window within which you must utilize it:
+
+```json
+{
+  "deal_id": "DEAL-2024-FX-78901",
+  "status": "BOOKED",
+  "from_currency": "USD",
+  "to_currency": "INR",
+  "source_amount": 500.00,
+  "destination_amount": 41710.00,
+  "locked_rate": 83.42,
+  "corridor": "US-IN",
+  "booked_at": "2024-07-15T10:00:00Z",
+  "expires_at": "2024-07-15T10:01:30Z",
+  "utilized": false,
+  "transaction_id": null
+}
+```
+
+Once you call the utilize endpoint, `utilized` becomes `true` and `transaction_id` is populated. Attempting to utilize an expired or already-utilized deal returns a `DEAL_EXPIRED` or `DEAL_ALREADY_UTILIZED` error respectively.
+
+## Deal Lifecycle
+
+| Status | Description |
+|---|---|
+| `BOOKED` | Rate is locked. You have until `expires_at` to attach this deal to a transaction. |
+| `UTILIZED` | Deal has been consumed by a transaction. The `transaction_id` field is populated. |
+| `EXPIRED` | The `expires_at` window passed before the deal was utilized. Book a new deal. |
+| `CANCELLED` | The deal was explicitly cancelled before utilization. |

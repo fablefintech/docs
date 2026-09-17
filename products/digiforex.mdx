@@ -1,0 +1,48 @@
+---
+title: "DigiForex: High-Volume Bulk Outbound Remittance"
+sidebarTitle: "DigiForex"
+description: "DigiForex enables banks to process high-volume bulk outbound remittances across corridors, currencies, and delivery channels at scale."
+---
+
+DigiForex is Fable Fintech's bulk remittance engine, built for banks that need to process large volumes of outbound transfers on behalf of corporate clients and institutional partners. Rather than handling payment files manually or stitching together fragmented systems, DigiForex gives you a single, automated pipeline — from file ingestion through compliance screening to final delivery — across any corridor, currency, or channel you operate in.
+
+## Key Capabilities
+
+- **Bulk file upload and processing** — Accept standard payment file formats from corporate clients and process thousands of transactions in a single batch
+- **Multi-currency and multi-corridor support** — Disburse payments across countries and currencies without corridor-by-corridor configuration overhead
+- **Configurable workflow management** — Define approval rules, exception handling policies, and retry logic to match your operational requirements
+- **Automated compliance screening** — Every transaction in a batch is screened for AML and sanctions compliance before dispatch
+- **Real-time status tracking** — Monitor the status of individual transactions within a bulk batch as they move through the payment pipeline
+- **Exception handling and retry logic** — Failed transactions are flagged, logged, and queued for review or automated retry without interrupting the rest of the batch
+
+## Use Case: Corporate Salary Disbursement
+
+A bank receives a bulk payment file from a corporate client needing to disburse monthly salaries across employees in the UAE, India, Philippines, and the UK — all in local currencies. DigiForex ingests the file, maps each payment to the correct corridor and delivery channel, runs compliance checks in parallel, and dispatches all transactions in a single automated workflow. Your operations team gets real-time visibility into each payment's status and is alerted only when an exception requires human review.
+
+## API Integration
+
+DigiForex exposes bulk upload endpoints that accept standard payment file formats, making it straightforward to connect your corporate banking portal or partner onboarding flow.
+
+```http
+POST /v1/digiforex/bulk-upload
+Content-Type: multipart/form-data
+
+{
+  "batch_reference": "CORP-BATCH-20250601",
+  "file": "<payment_file>",
+  "currency_pairs": ["AED-INR", "AED-PHP", "AED-GBP"],
+  "notify_on_completion": true
+}
+```
+
+<Note>
+  DigiForex is designed for bank-grade volumes. The platform is capable of processing high-volume corporate and institutional payment batches with full compliance and real-time tracking — ensuring your SLAs are met even at peak disbursement periods.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={1}>
+  <Card title="Bulk Processing Guide" icon="layer-group" href="/guides/bulk-processing">
+    Learn how to configure bulk upload workflows, manage exceptions, and monitor batch status through the DigiForex API.
+  </Card>
+</CardGroup>

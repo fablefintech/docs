@@ -1,0 +1,67 @@
+---
+title: "Fund Collection Integrations"
+sidebarTitle: "Fund Collection"
+description: "Fable Fintech supports multiple fund collection methods — SWIFT, UPI, card rails, and local payment networks — to collect sender funds across corridors."
+---
+
+Fund collection is the first step in a remittance transaction — collecting money from the sender using their preferred payment method. Fable connects to a broad set of collection rails so that you can offer locally relevant payment options in each send corridor, increasing conversion and reducing friction for your customers. Collection methods are configured per corridor during onboarding and can be combined to give senders a choice at the point of transaction.
+
+## Supported Collection Methods
+
+The table below lists the collection integrations available on the Fable platform, the regions where they are most commonly used, and the underlying payment type.
+
+| Collection Method | Supported Regions | Payment Type |
+|---|---|---|
+| **SWIFT** | Global | Bank-to-bank wire transfer |
+| **UPI** | India | Instant bank transfer (real-time) |
+| **KNET** | Kuwait | National debit card network |
+| **NETS** | Singapore | National electronic funds transfer |
+| **CCAvenue** | India | Payment gateway — cards & net banking |
+| **Global Payments** | Global (multi-region) | Card processing (Visa, Mastercard) |
+| **Benefit** | Bahrain | National payment network |
+| **PoLi** | Australia, New Zealand | Real-time bank transfer |
+
+### Method Descriptions
+
+**SWIFT**
+SWIFT-based collection enables bank-to-bank wire transfers for institutional and high-value cross-border payments. It is widely used where senders initiate transfers directly from their bank account to your platform's collection account.
+
+**UPI (Unified Payments Interface)**
+UPI is India's real-time payment rail operated by NPCI. It is the dominant collection method for INR-denominated remittances and supports instant fund confirmation, making it ideal for high-volume retail corridors originating from India.
+
+**KNET**
+KNET is Kuwait's national payment network, used for debit card transactions and direct bank payments within Kuwait. It is the standard collection method for KWD-denominated corridors.
+
+**NETS**
+NETS is Singapore's national electronic payment system, enabling direct bank transfers and debit card payments for SGD corridors. It is widely used at point-of-sale and for online transactions within Singapore.
+
+**CCAvenue**
+CCAvenue is a leading Indian payment gateway supporting credit cards, debit cards, and net banking from major Indian banks. It provides a broad coverage of payment options for India-originating corridors alongside UPI.
+
+**Global Payments**
+Global Payments provides international card processing infrastructure, supporting Visa and Mastercard transactions for corridors where senders prefer to pay by card. It is suitable for multi-country send operations requiring a single card processing integration.
+
+**Benefit**
+Benefit is Bahrain's national payment network, enabling debit card and bank transfer collections in BHD. It is the primary collection method for corridors originating from Bahrain.
+
+**PoLi**
+PoLi enables real-time bank transfers directly from a sender's online banking account in Australia and New Zealand. It requires no card or e-wallet setup, making it a convenient low-friction option for AUD and NZD corridors.
+
+## Configuring Collection Methods
+
+Collection methods are activated at the corridor level during your integration setup with Fable. Once configured, you specify the collection method on each transaction request using the `collection_method` field. Some methods require additional parameters — for example, UPI requires the sender's UPI ID.
+
+```json
+{
+  "collection_method": "UPI",
+  "upi_id": "customer@upi"
+}
+```
+
+For card-based collection via Global Payments or CCAvenue, the collection method triggers a hosted payment page or tokenised card flow configured by your implementation team. For bank-push methods like SWIFT and PoLi, Fable returns the collection account details to display to the sender.
+
+You can configure multiple collection methods per corridor to give senders a choice. Fable will validate that the collection method passed in the request is enabled for the transaction's source corridor before processing.
+
+<Tip>
+  For each corridor, enable the collection method that is most widely used by senders in that country. For example, use UPI as the primary method for India-originated transactions — it has near-universal adoption and provides instant fund confirmation, which improves transaction speed and reduces collection failure rates.
+</Tip>

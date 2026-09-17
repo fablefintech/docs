@@ -1,0 +1,358 @@
+---
+title: "Code Example: Bulk Remittance Upload with DigiForex"
+sidebarTitle: "Bulk Upload"
+description: "Code examples for uploading and tracking bulk remittance batches using the Fable Fintech DigiForex bulk API in JavaScript, Python, and Java."
+---
+
+These examples show how to submit a bulk batch of transactions using DigiForex, monitor batch progress, and handle per-transaction exceptions. The bulk API lets you submit up to 1,000 transactions in a single request, making it ideal for payroll disbursements, marketplace payouts, and high-volume remittance corridors.
+
+<Tip>
+  Limit each batch to **1,000 transactions** per request for optimal processing performance and to stay within API rate limits. For larger volumes, split your dataset into multiple batches and submit them sequentially or in controlled parallel bursts.
+</Tip>
+
+<CodeGroup>
+
+```typescript JavaScript
+import { FableClient, FableApiError } from '@fable-fintech/sdk';
+
+const fable = new FableClient({
+  apiKey: process.env.FABLE_API_KEY,
+  environment: 'sandbox',
+});
+
+async function submitBulkRemittance() {
+  // Step 1: Build the batch payload (max 1,000 items per request)
+  const transactions = [
+    {
+      reference: 'REF-001',
+      sender: { name: 'Acme Corp', country: 'US', currency: 'USD' },
+      receiver: {
+        name: 'Ravi Kumar',
+        country: 'IN',
+        account_number: '111122223333',
+        bank_code: 'SBIN0001234',
+      },
+      amount: 200,
+      source_currency: 'USD',
+      destination_currency: 'INR',
+      corridor: 'US-IN',
+      channel: 'BANK_TRANSFER',
+    },
+    {
+      reference: 'REF-002',
+      sender: { name: 'Acme Corp', country: 'US', currency: 'USD' },
+      receiver: {
+        name: 'Priya Patel',
+        country: 'IN',
+        account_number: '444455556666',
+        bank_code: 'ICIC0004321',
+      },
+      amount: 350,
+      source_currency: 'USD',
+      destination_currency: 'INR',
+      corridor: 'US-IN',
+      channel: 'BANK_TRANSFER',
+    },
+    // ... up to 1,000 items
+  ];
+
+  // Step 2: Submit the batch
+  const batch = await fable.transactions.createBatch({
+    transactions,
+    corridor: 'US-IN',
+    notify_url: 'https://your-app.com/webhooks/fable/batch',
+  });
+
+  console.log(`Batch submitted: ${batch.batch_id}`);
+  console.log(`Total transactions: ${batch.total_count}`);
+
+  // Step 3: Poll for batch completion
+  const terminalStates = new Set(['COMPLETED', 'PARTIAL', 'FAILED']);
+  let batchStatus = batch.status;
+
+  while (!terminalStates.has(batchStatus)) {
+    await new Promise((resolve) => setTimeout(resolve, 10000)); // wait 10s
+    const statusResponse = await fable.transactions.getBatchStatus(batch.batch_id);
+    batchStatus = statusResponse.status;
+
+    console.log(
+      `Batch status: ${batchStatus} | ` +
+      `Processed: ${statusResponse.processed_count}/${statusResponse.total_count} | ` +
+      `Failed: ${statusResponse.failed_count}`
+    );
+  }
+
+  // Step 4: Retrieve the full batch result to inspect per-transaction outcomes
+  const result = await fable.transactions.getBatch(batch.batch_id);
+
+  const failed = result.transactions.filter((t) => t.status === 'FAILED');
+  if (failed.length > 0) {
+    console.warn(`${failed.length} transaction(s) failed:`);
+    for (const tx of failed) {
+      console.warn(`  ${tx.reference}: [${tx.error_code}] ${tx.error_message}`);
+    }
+  }
+
+  console.log(`Batch complete. Successful: ${result.successful_count}, Failed: ${result.failed_count}`);
+  return result;
+}
+
+submitBulkRemittance().catch((err) => {
+  if (err instanceof FableApiError) {
+    console.error(`Fable API error [${err.code}]: ${err.message}`);
+  } else {
+    console.error(err);
+  }
+});
+```
+
+```python Python
+import time
+from fable_fintech import FableClient
+from fable_fintech.exceptions import FableApiError
+
+client = FableClient(
+    api_key="your_sandbox_api_key",
+    environment="sandbox",
+)
+
+
+def submit_bulk_remittance():
+    # Step 1: Build the batch payload (max 1,000 items per request)
+    transactions = [
+        {
+            "reference": "REF-001",
+            "sender": {"name": "Acme Corp", "country": "US", "currency": "USD"},
+            "receiver": {
+                "name": "Ravi Kumar",
+                "country": "IN",
+                "account_number": "111122223333",
+                "bank_code": "SBIN0001234",
+            },
+            "amount": 200.00,
+            "source_currency": "USD",
+            "destination_currency": "INR",
+            "corridor": "US-IN",
+            "channel": "BANK_TRANSFER",
+        },
+        {
+            "reference": "REF-002",
+            "sender": {"name": "Acme Corp", "country": "US", "currency": "USD"},
+            "receiver": {
+                "name": "Priya Patel",
+                "country": "IN",
+                "account_number": "444455556666",
+                "bank_code": "ICIC0004321",
+            },
+            "amount": 350.00,
+            "source_currency": "USD",
+            "destination_currency": "INR",
+            "corridor": "US-IN",
+            "channel": "BANK_TRANSFER",
+        },
+        # ... up to 1,000 items
+    ]
+
+    # Step 2: Submit the batch
+    batch = client.transactions.create_batch(
+        transactions=transactions,
+        corridor="US-IN",
+        notify_url="https://your-app.com/webhooks/fable/batch",
+    )
+
+    print(f"Batch submitted: {batch.batch_id}")
+    print(f"Total transactions: {batch.total_count}")
+
+    # Step 3: Poll for batch completion
+    terminal_states = {"COMPLETED", "PARTIAL", "FAILED"}
+    batch_status = batch.status
+
+    while batch_status not in terminal_states:
+        time.sleep(10)
+        status_response = client.transactions.get_batch_status(batch.batch_id)
+        batch_status = status_response.status
+        print(
+            f"Batch status: {batch_status} | "
+            f"Processed: {status_response.processed_count}/{status_response.total_count} | "
+            f"Failed: {status_response.failed_count}"
+        )
+
+    # Step 4: Retrieve the full batch result to inspect per-transaction outcomes
+    result = client.transactions.get_batch(batch.batch_id)
+
+    failed = [t for t in result.transactions if t.status == "FAILED"]
+    if failed:
+        print(f"{len(failed)} transaction(s) failed:")
+        for tx in failed:
+            print(f"  {tx.reference}: [{tx.error_code}] {tx.error_message}")
+
+    print(
+        f"Batch complete. "
+        f"Successful: {result.successful_count}, Failed: {result.failed_count}"
+    )
+    return result
+
+
+if __name__ == "__main__":
+    try:
+        submit_bulk_remittance()
+    except FableApiError as e:
+        print(f"Fable API error [{e.code}]: {e.message}")
+```
+
+```java Java
+import com.fablefintech.FableClient;
+import com.fablefintech.exception.FableApiException;
+import com.fablefintech.model.*;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+public class BulkRemittanceExample {
+
+    private static final Set<String> TERMINAL_STATES =
+        Set.of("COMPLETED", "PARTIAL", "FAILED");
+
+    public static void main(String[] args) throws InterruptedException {
+        FableClient client = FableClient.builder()
+            .apiKey(System.getenv("FABLE_API_KEY"))
+            .environment(Environment.SANDBOX)
+            .build();
+
+        try {
+            submitBulkRemittance(client);
+        } catch (FableApiException e) {
+            System.err.printf("Fable API error [%s]: %s%n", e.getCode(), e.getMessage());
+        }
+    }
+
+    static BatchResult submitBulkRemittance(FableClient client)
+            throws FableApiException, InterruptedException {
+
+        // Step 1: Build the batch payload (max 1,000 items per request)
+        List<BatchTransactionItem> items = List.of(
+            BatchTransactionItem.builder()
+                .reference("REF-001")
+                .sender(Sender.builder().name("Acme Corp").country("US").currency("USD").build())
+                .receiver(Receiver.builder()
+                    .name("Ravi Kumar")
+                    .country("IN")
+                    .accountNumber("111122223333")
+                    .bankCode("SBIN0001234")
+                    .build())
+                .amount(BigDecimal.valueOf(200))
+                .sourceCurrency("USD")
+                .destinationCurrency("INR")
+                .corridor("US-IN")
+                .channel(Channel.BANK_TRANSFER)
+                .build(),
+            BatchTransactionItem.builder()
+                .reference("REF-002")
+                .sender(Sender.builder().name("Acme Corp").country("US").currency("USD").build())
+                .receiver(Receiver.builder()
+                    .name("Priya Patel")
+                    .country("IN")
+                    .accountNumber("444455556666")
+                    .bankCode("ICIC0004321")
+                    .build())
+                .amount(BigDecimal.valueOf(350))
+                .sourceCurrency("USD")
+                .destinationCurrency("INR")
+                .corridor("US-IN")
+                .channel(Channel.BANK_TRANSFER)
+                .build()
+            // ... up to 1,000 items
+        );
+
+        // Step 2: Submit the batch
+        CreateBatchRequest batchRequest = CreateBatchRequest.builder()
+            .transactions(items)
+            .corridor("US-IN")
+            .notifyUrl("https://your-app.com/webhooks/fable/batch")
+            .build();
+
+        Batch batch = client.transactions().createBatch(batchRequest);
+        System.out.printf("Batch submitted: %s%n", batch.getBatchId());
+        System.out.printf("Total transactions: %d%n", batch.getTotalCount());
+
+        // Step 3: Poll for batch completion
+        String batchStatus = batch.getStatus();
+        while (!TERMINAL_STATES.contains(batchStatus)) {
+            TimeUnit.SECONDS.sleep(10);
+            BatchStatus statusResponse = client.transactions()
+                .getBatchStatus(batch.getBatchId());
+            batchStatus = statusResponse.getStatus();
+            System.out.printf(
+                "Batch status: %s | Processed: %d/%d | Failed: %d%n",
+                batchStatus,
+                statusResponse.getProcessedCount(),
+                statusResponse.getTotalCount(),
+                statusResponse.getFailedCount()
+            );
+        }
+
+        // Step 4: Retrieve full batch result to inspect per-transaction outcomes
+        BatchResult result = client.transactions().getBatch(batch.getBatchId());
+
+        result.getTransactions().stream()
+            .filter(t -> "FAILED".equals(t.getStatus()))
+            .forEach(t -> System.err.printf(
+                "  %s: [%s] %s%n",
+                t.getReference(), t.getErrorCode(), t.getErrorMessage()
+            ));
+
+        System.out.printf(
+            "Batch complete. Successful: %d, Failed: %d%n",
+            result.getSuccessfulCount(),
+            result.getFailedCount()
+        );
+
+        return result;
+    }
+}
+```
+
+</CodeGroup>
+
+## Example Batch Status Response
+
+After submitting a batch you can call `GET /v1/transactions/batches/{batch_id}` directly, or use the SDK methods shown above. The response follows this structure:
+
+```json
+{
+  "batch_id": "BATCH-2024-XYZ9876",
+  "status": "PARTIAL",
+  "corridor": "US-IN",
+  "total_count": 2,
+  "processed_count": 2,
+  "successful_count": 1,
+  "failed_count": 1,
+  "created_at": "2024-07-15T09:00:00Z",
+  "completed_at": "2024-07-15T09:04:32Z",
+  "transactions": [
+    {
+      "reference": "REF-001",
+      "transaction_id": "TXN-2024-ABCD1111",
+      "status": "COMPLETED",
+      "error_code": null,
+      "error_message": null
+    },
+    {
+      "reference": "REF-002",
+      "transaction_id": null,
+      "status": "FAILED",
+      "error_code": "INVALID_BANK_CODE",
+      "error_message": "The bank code ICIC0004321 is not valid for corridor US-IN."
+    }
+  ]
+}
+```
+
+A batch can complete in one of three terminal states:
+
+| Status | Description |
+|---|---|
+| `COMPLETED` | All transactions in the batch were processed successfully. |
+| `PARTIAL` | At least one transaction succeeded and at least one failed. Review the `transactions` array for per-item error details. |
+| `FAILED` | All transactions in the batch failed. Check the individual `error_code` values to understand the cause. |

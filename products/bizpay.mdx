@@ -1,0 +1,55 @@
+---
+title: "BizPay: Cross-Border Business Payments for SMEs"
+sidebarTitle: "BizPay"
+description: "BizPay lets banks offer SMEs a complete cross-border payment solution — multi-corridor payables and receivables with invoicing and self-onboarding."
+---
+
+BizPay turns your bank's current accounts into powerful cross-border payment tools for small and medium-sized enterprises. With plug-and-play APIs that connect directly to your existing core banking system, you can go live in as little as 15 days — giving your SME customers the ability to send and receive business payments globally without navigating complex bank integrations or lengthy onboarding processes. BizPay is designed to make your bank the go-to financial partner for SME cross-border trade.
+
+## Key Capabilities
+
+- **Multi-corridor payables and receivables** — Support inbound and outbound business payments across major trade corridors, giving your SME clients full coverage for their international operations
+- **Self-service SME onboarding** — SME customers can onboard themselves through a guided digital flow, reducing your bank's operational overhead and accelerating time to first transaction
+- **Invoice management** — Customers can create, send, and track invoices directly within the payment flow, tying each payment to a clear business document
+- **Local payout network integration** — Funds are delivered through local payment rails in destination markets, ensuring fast and cost-effective payouts to beneficiaries
+- **Real-time FX rates** — Customers see live exchange rates before confirming every transaction, ensuring full transparency on cross-border payment costs
+- **Transaction tracking** — End-to-end visibility on every payment, from initiation through compliance screening to final delivery
+
+## Value Proposition
+
+Your SME customers don't need to build complex treasury functions or maintain relationships with multiple correspondent banks just to pay a supplier in Vietnam or collect from a customer in Germany. BizPay abstracts that complexity away — letting SMEs operate globally through the same bank account they use every day. For your bank, BizPay creates a high-value, recurring revenue stream from the SME segment with minimal operational lift.
+
+<Tip>
+  BizPay's self-onboarding flow is designed to meet your bank's KYC and compliance requirements out of the box, so you can extend cross-border payment access to SME customers without a manual review bottleneck.
+</Tip>
+
+## Technical Integration
+
+BizPay connects to your bank's existing core banking system through a set of plug-and-play REST APIs. There is no need to replace or significantly modify your core infrastructure — BizPay layers on top of what you already have.
+
+```http
+POST /v1/bizpay/payments
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "sender_account": "ACC-SME-001",
+  "beneficiary": {
+    "name": "Nguyen Exports Ltd",
+    "bank_code": "VCB",
+    "account_number": "1234567890",
+    "country": "VN"
+  },
+  "amount": 15000.00,
+  "currency": "USD",
+  "purpose": "Trade Invoice #INV-2025-0042"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={1}>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Explore the full BizPay API reference — authentication, payment initiation, FX rates, invoice management, and webhook events.
+  </Card>
+</CardGroup>

@@ -1,0 +1,116 @@
+---
+title: "Compliance and KYC in Fable Fintech"
+sidebarTitle: "Compliance & KYC"
+description: "Understand how Fable Fintech handles KYC verification, AML screening, sanctions checks, and 4-Eye/6-Eye approval workflows for compliant remittance."
+---
+
+Compliance is not an afterthought in Fable Fintech — it is built into the core of every product. Every transaction, regardless of value or corridor, automatically flows through a multi-layered compliance pipeline covering identity verification, anti-money laundering screening, and real-time sanctions checks before a single cent is moved. This architecture means you inherit a robust, pre-tested compliance framework from day one, reducing your regulatory burden while keeping your operations audit-ready at all times.
+
+<CardGroup cols={2}>
+  <Card title="KYC Verification" icon="id-card">
+    Identity verification for senders and recipients via integrated third-party KYC providers before any transaction is processed.
+  </Card>
+  <Card title="AML Screening" icon="shield-halved">
+    Automated anti-money laundering screening on every transaction, with flagging and manual review workflows for suspicious activity.
+  </Card>
+  <Card title="Sanctions Screening" icon="ban">
+    Real-time checks against OFAC, UN, EU, and other global sanctions lists. Blocked transactions are logged and reported automatically.
+  </Card>
+  <Card title="Workflow Approvals" icon="users">
+    Configurable 4-Eye and 6-Eye multi-person approval workflows for high-value or sensitive transactions, enforced before processing.
+  </Card>
+</CardGroup>
+
+## KYC Verification
+
+Before a customer can initiate a transaction on any Fable-powered product, they must complete identity verification. KYC (Know Your Customer) verification confirms that the sender — and in some corridors the recipient — is who they claim to be, satisfying regulatory requirements across all supported jurisdictions.
+
+Fable integrates with a portfolio of best-in-class identity verification providers, giving you the flexibility to use the provider that best fits your regional requirements or existing vendor agreements. KYC data, including document images, liveness checks, and identity extracts, is submitted to and managed via the `/compliance/kyc` endpoint.
+
+The KYC verification process typically covers:
+
+- **Document verification** — Government-issued ID, passport, or driving licence scanned and validated for authenticity.
+- **Liveness / selfie check** — Biometric confirmation that the person presenting the document is physically present.
+- **Data extraction and matching** — Automated extraction of name, date of birth, and document number, matched against the customer's registered profile.
+- **Risk scoring** — Each verification session produces a risk score that informs downstream transaction limits and approval rules.
+
+A customer's KYC status is returned in the `kyc_status` field of their profile. Transactions initiated by customers with a status other than `APPROVED` will be rejected at the compliance screening stage.
+
+```json
+{
+  "customer_id": "CUST-20240115-GHI012",
+  "kyc_status": "APPROVED",
+  "kyc_provider": "JUMIO",
+  "verified_at": "2024-01-10T08:22:00Z",
+  "expiry_date": "2026-01-10T08:22:00Z"
+}
+```
+
+## AML Screening
+
+Every transaction submitted to Fable is automatically screened against AML (Anti-Money Laundering) databases before it proceeds to processing. The AML engine evaluates transaction patterns, amounts, counterparty relationships, and corridor-specific risk indicators to identify activity that may indicate financial crime.
+
+The AML screening process runs asynchronously immediately after transaction creation. During this stage, the transaction status is set to `SCREENING`. For the vast majority of transactions, screening completes within a few seconds and the transaction advances automatically.
+
+If the AML engine identifies a risk indicator — such as an unusually high transaction amount, a high-risk corridor, or a pattern consistent with structuring — the transaction is flagged and its status is updated to `AWAITING_REVIEW`. A compliance officer on your team, or Fable's managed compliance service if engaged, must review and clear or reject the transaction before it can proceed.
+
+<Note>
+  All AML flags, review decisions, and reviewer identities are stored in a tamper-evident audit log accessible via the Compliance Dashboard and the `/compliance/audit` API endpoint.
+</Note>
+
+## Sanctions Screening
+
+Fable performs real-time sanctions screening on both the sender and recipient of every transaction. Checks are run against the following global sanctions and watchlists:
+
+- **OFAC** (US Office of Foreign Assets Control) — SDN and non-SDN lists.
+- **UN Security Council** — Consolidated sanctions list.
+- **EU** — European Union consolidated list of persons, groups, and entities.
+- **UK HM Treasury** — Financial Sanctions targets list.
+- **Additional lists** — Configurable per corridor; may include regional or domestic lists required by your licensing jurisdiction.
+
+If a match is found against any enabled sanctions list, the transaction is **automatically blocked** and cannot proceed. A blocked transaction is logged with the full match details, the list source, and a timestamp. Your compliance team is notified and can access the full record via the Compliance Dashboard.
+
+Partial matches and fuzzy-match candidates are escalated for manual review rather than hard-blocked, ensuring legitimate transactions with similar names to listed entities are not incorrectly rejected.
+
+<Warning>
+  Compliance requirements vary by corridor and jurisdiction. Fable's built-in screening covers the major international lists, but you remain responsible for ensuring your business complies with all applicable local regulations. Always verify the specific AML and sanctions obligations for each corridor you operate.
+</Warning>
+
+## 4-Eye and 6-Eye Approval
+
+For high-value, high-risk, or operationally sensitive transactions, Fable's workflow engine enforces multi-person approval before a transaction is released for processing. These workflows are known as **4-Eye** and **6-Eye** approvals, named for the number of eyes — people — that must review and sign off before the transaction moves forward.
+
+### 4-Eye Approval (Two-Person Rule)
+
+A 4-Eye approval requires **two separate authorised users** to independently review and approve a transaction. The first user initiates or submits the transaction; a second user — who must be a different individual — reviews the details and approves before processing begins.
+
+4-Eye approval is typically applied to:
+- Transactions above a configured value threshold.
+- First-time transfers to a new recipient.
+- Transactions in higher-risk corridors.
+
+### 6-Eye Approval (Three-Person Rule)
+
+A 6-Eye approval requires **three separate authorised users** to review and approve a transaction sequentially. This provides an additional layer of oversight for the most sensitive operations.
+
+6-Eye approval is typically applied to:
+- Very high-value transfers (e.g., above a bank's internal large-value threshold).
+- Transactions involving manually overridden AML flags.
+- Bulk disbursements via DigiForex or LastMile above a defined aggregate limit.
+
+When a transaction enters an approval workflow, its status is set to `AWAITING_APPROVAL`. Each approver receives a notification via the platform dashboard or a configured webhook. Approval actions are recorded against the approver's identity in the audit log. A transaction cannot advance to `PROCESSING` until all required approvals have been granted.
+
+## Compliance Partners
+
+Fable's compliance framework is backed by a suite of pre-integrated third-party providers. These integrations are live and tested, meaning you can activate them without building custom connectors.
+
+| Partner           | Category                        | Capability                                                   |
+|-------------------|---------------------------------|--------------------------------------------------------------|
+| **Jumio**         | KYC / Identity Verification     | Document verification, liveness detection, biometric matching|
+| **Trulioo**       | KYC / Global Identity           | Global identity network, 195+ countries                      |
+| **Shufti Pro**    | KYC / Identity Verification     | AI-powered document and face verification                    |
+| **AccuSystems**   | KYC / Document Management      | Document collection, storage, and verification workflows     |
+| **ComplyAdvantage**| AML / Risk Intelligence        | Real-time AML screening, PEP and adverse media checks        |
+| **AML Partners**  | AML / Sanctions                 | Configurable list screening and watchlist management         |
+
+Your Fable integration can be configured to use one or more of these providers depending on your compliance architecture, existing vendor relationships, and the jurisdictions you serve. Contact your account team to discuss provider configuration.

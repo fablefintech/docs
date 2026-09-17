@@ -1,0 +1,219 @@
+---
+title: "JavaScript & TypeScript SDK for Fable Fintech"
+sidebarTitle: "JavaScript"
+description: "Install and use the Fable Fintech JavaScript SDK to create transactions, fetch FX rates, and run compliance checks in Node.js or browser environments."
+---
+
+The `@fable-fintech/sdk` package is a TypeScript-first client library for Node.js. It provides typed methods, async/await support, and structured error handling — so you can integrate cross-border remittance, FX rates, and compliance checks without writing raw HTTP calls. The package ships with full TypeScript declarations and works in both CommonJS and ESM projects.
+
+## Installation
+
+<CodeGroup>
+
+```bash npm
+npm install @fable-fintech/sdk
+```
+
+```bash yarn
+yarn add @fable-fintech/sdk
+```
+
+```bash pnpm
+pnpm add @fable-fintech/sdk
+```
+
+</CodeGroup>
+
+## Initialization
+
+Import `FableClient` and pass your API key along with the target environment. Use `'sandbox'` during development and `'production'` for live traffic.
+
+```typescript
+import { FableClient } from '@fable-fintech/sdk';
+
+const fable = new FableClient({
+  apiKey: process.env.FABLE_API_KEY,
+  environment: 'sandbox', // or 'production'
+});
+```
+
+<Note>
+  Never hard-code your API key in source code. Use environment variables or a secrets manager such as AWS Secrets Manager or HashiCorp Vault.
+</Note>
+
+## Creating a Transaction
+
+Call `fable.transactions.create()` with the sender, receiver, and payment details. The method returns a `Transaction` object containing the assigned `transaction_id` and the initial `status`.
+
+```typescript
+const transaction = await fable.transactions.create({
+  sender: { name: 'John Doe', country: 'US', currency: 'USD' },
+  receiver: {
+    name: 'Jane Smith',
+    country: 'IN',
+    account_number: '123456789012',
+    bank_code: 'HDFC0001234',
+  },
+  amount: 500,
+  source_currency: 'USD',
+  destination_currency: 'INR',
+  corridor: 'US-IN',
+  channel: 'BANK_TRANSFER',
+});
+
+console.log(transaction.transaction_id, transaction.status);
+// TXN-2024-ABCD1234  PENDING
+```
+
+## Fetching FX Rates
+
+Use `fable.fx.getRate()` to retrieve the live exchange rate for a currency pair. The response includes the rate and a `valid_until` timestamp so you can display rate expiry to end users.
+
+```typescript
+const rate = await fable.fx.getRate({ from: 'USD', to: 'INR' });
+console.log(`Rate: ${rate.rate}, valid until: ${rate.valid_until}`);
+// Rate: 83.42, valid until: 2024-07-15T10:30:00Z
+```
+
+## Polling Transaction Status
+
+After creating a transaction, poll `fable.transactions.getStatus()` with the transaction ID to track progress through the payment lifecycle.
+
+```typescript
+const status = await fable.transactions.getStatus(transaction.transaction_id);
+console.log(status.status);
+// PROCESSING
+```
+
+<Tip>
+  Rather than polling on a fixed interval, register a webhook endpoint with `fable.webhooks.register()` to receive real-time status change events and reduce unnecessary API calls.
+</Tip>
+
+## Booking and Utilizing an FX Deal
+
+To lock in an exchange rate before submitting a transaction, book an FX deal and then reference the deal ID when creating the transaction.
+
+```typescript
+// Book a deal to lock the current rate
+const deal = await fable.fx.bookDeal({
+  from: 'USD',
+  to: 'INR',
+  amount: 500,
+  corridor: 'US-IN',
+});
+console.log(`Deal: ${deal.deal_id}, expires at: ${deal.expires_at}`);
+
+// Create the transaction referencing the booked deal
+const transaction = await fable.transactions.create({
+  sender: { name: 'John Doe', country: 'US', currency: 'USD' },
+  receiver: {
+    name: 'Jane Smith',
+    country: 'IN',
+    account_number: '123456789012',
+    bank_code: 'HDFC0001234',
+  },
+  amount: 500,
+  source_currency: 'USD',
+  destination_currency: 'INR',
+  corridor: 'US-IN',
+  channel: 'BANK_TRANSFER',
+  fx_deal_id: deal.deal_id,
+});
+
+// Mark the deal as utilized once the transaction is confirmed
+await fable.fx.utilizeDeal(deal.deal_id, {
+  transaction_id: transaction.transaction_id,
+});
+```
+
+## Running Compliance Checks
+
+### KYC Submission
+
+```typescript
+const kycResult = await fable.compliance.submitKyc({
+  customer_id: 'CUST-001',
+  full_name: 'John Doe',
+  date_of_birth: '1990-01-15',
+  nationality: 'US',
+  id_type: 'PASSPORT',
+  id_number: 'A12345678',
+  id_expiry: '2030-01-15',
+});
+console.log(kycResult.status); // APPROVED | PENDING | REJECTED
+```
+
+### AML Screening
+
+```typescript
+const amlResult = await fable.compliance.runAmlScreening({
+  customer_id: 'CUST-001',
+  full_name: 'John Doe',
+  date_of_birth: '1990-01-15',
+  nationality: 'US',
+});
+console.log(amlResult.risk_level); // LOW | MEDIUM | HIGH
+```
+
+## Registering a Webhook
+
+```typescript
+const webhook = await fable.webhooks.register({
+  url: 'https://your-app.com/webhooks/fable',
+  events: ['transaction.completed', 'transaction.failed', 'kyc.status_changed'],
+  secret: process.env.WEBHOOK_SECRET,
+});
+console.log(webhook.webhook_id, webhook.status);
+```
+
+## Error Handling
+
+The SDK throws a `FableApiError` for any non-2xx API response. Catch it to access the structured error code and message.
+
+```typescript
+import { FableApiError } from '@fable-fintech/sdk';
+
+try {
+  const tx = await fable.transactions.create(payload);
+} catch (error) {
+  if (error instanceof FableApiError) {
+    console.error(error.code, error.message);
+    // INSUFFICIENT_BALANCE  Sender account has insufficient funds
+    console.error('HTTP status:', error.httpStatus);
+    console.error('Request ID:', error.requestId);
+  } else {
+    // Re-throw unexpected errors
+    throw error;
+  }
+}
+```
+
+Common error codes you may encounter:
+
+| Code | HTTP Status | Description |
+|---|---|---|
+| `INVALID_CORRIDOR` | 400 | The specified corridor is not supported. |
+| `KYC_REQUIRED` | 403 | Sender KYC must be completed before transacting. |
+| `DEAL_EXPIRED` | 409 | The referenced FX deal has expired. |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests — the SDK will retry automatically. |
+| `INTERNAL_ERROR` | 500 | Unexpected server error — contact support with the `requestId`. |
+
+## TypeScript Types
+
+All request and response types are exported from the package root so you can use them in your own type annotations.
+
+```typescript
+import type {
+  CreateTransactionRequest,
+  Transaction,
+  TransactionStatus,
+  FxRate,
+  FxDeal,
+  KycResult,
+  AmlResult,
+  Webhook,
+  FableClientOptions,
+} from '@fable-fintech/sdk';
+```
+
+These types are generated directly from the Fable OpenAPI specification, so they stay in sync with the API as it evolves.

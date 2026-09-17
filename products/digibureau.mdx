@@ -1,0 +1,47 @@
+---
+title: "DigiBureau: End-to-End FX Deal Booking Platform"
+sidebarTitle: "DigiBureau"
+description: "DigiBureau enables banks to offer FX deal booking for individuals, corporates, and partner banks through one integrated platform."
+---
+
+DigiBureau is Fable Fintech's unified FX deal management platform, giving your bank the infrastructure to offer end-to-end foreign exchange deal booking for cross-border transactions across all customer segments. Whether you serve retail customers making personal transfers, corporates managing treasury exposure, or partner banks looking to book FX through your institution, DigiBureau brings it all together in a single integrated workflow — from live rate execution through to deal utilization and audit reporting.
+
+## Key Capabilities
+
+- **Deal booking for individuals, corporates, and partner banks** — Serve all customer segments from a single platform, with deal parameters and approval workflows configurable per segment
+- **Deal utilization tracking** — Monitor how much of a booked deal has been drawn down, with alerts when a deal approaches full utilization or expiry
+- **Live rate execution** — Fetch real-time FX rates via API at the point of deal booking, ensuring your customers always transact at accurate market rates
+- **Multi-currency support** — Book deals across all major currency pairs supported by your bank's treasury function
+- **Audit trail and reporting** — Every deal, rate fetch, approval, and utilization event is logged with timestamps and user attribution for full regulatory auditability
+
+## Deal Booking Workflow
+
+<Steps>
+  <Step title="Customer Requests an FX Deal">
+    A retail customer, corporate treasurer, or partner bank submits an FX deal request through your bank's portal or directly via the DigiBureau API, specifying the currency pair, amount, and value date.
+  </Step>
+  <Step title="Bank Fetches Live Rate via API">
+    DigiBureau calls your connected rate provider in real time to fetch the current interbank or marked-up rate for the requested currency pair. The rate is presented to the customer for confirmation.
+  </Step>
+  <Step title="Deal is Booked and Confirmed">
+    Once the customer accepts the rate, the deal is booked in DigiBureau's deal management system. A deal reference number is generated and confirmation is sent to all parties.
+  </Step>
+  <Step title="Funds are Transferred">
+    The underlying cross-border payment is initiated and routed through the appropriate payment channel. The transaction is linked to the booked deal for full traceability.
+  </Step>
+  <Step title="Deal is Marked Utilized">
+    On successful fund transfer, DigiBureau automatically updates the deal status to utilized and records the final settlement details in the audit log. Partially utilized deals remain open for further drawdown.
+  </Step>
+</Steps>
+
+<Note>
+  DigiBureau supports both spot deals and forward deal bookings, allowing your corporate and partner bank customers to hedge FX exposure in advance of a payment.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={1}>
+  <Card title="FX Deal Booking Guide" icon="chart-line" href="/guides/fx-deal-booking">
+    Walk through the complete DigiBureau deal booking flow — from fetching a live rate to confirming utilization — with API examples for each step.
+  </Card>
+</CardGroup>

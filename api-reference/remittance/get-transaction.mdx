@@ -1,0 +1,167 @@
+---
+title: "GET /transactions/{id} — Retrieve Transaction"
+sidebarTitle: "Get Transaction"
+description: "GET /transactions/{id} — retrieves full details of a remittance transaction by ID, including current status and delivery information."
+---
+
+Retrieve the full details of an existing transaction, including its current status, exchange rate applied, delivery information, and — if applicable — failure reason. Use this endpoint when you need a complete snapshot of a transaction at any point in its lifecycle.
+
+## Endpoint
+
+```
+GET /transactions/{transaction_id}
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Path Parameters
+
+<ParamField path="transaction_id" type="string" required>
+  The unique identifier of the transaction to retrieve. This is the `transaction_id` returned when the transaction was created.
+</ParamField>
+
+## Example Request
+
+```bash
+curl https://api-sandbox.fablefintech.com/v1/transactions/txn_01HZ9QKBNK3J2F4P8GRWSV7MEX \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json"
+```
+
+## Response Fields
+
+<ResponseField name="transaction_id" type="string">
+  Unique identifier for the transaction.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current status of the transaction. See [Transaction Status](/api-reference/remittance/transaction-status) for all possible values and their meanings.
+</ResponseField>
+
+<ResponseField name="amount" type="number">
+  The source amount as originally submitted.
+</ResponseField>
+
+<ResponseField name="source_currency" type="string">
+  ISO 4217 code of the source currency.
+</ResponseField>
+
+<ResponseField name="destination_currency" type="string">
+  ISO 4217 code of the destination currency.
+</ResponseField>
+
+<ResponseField name="exchange_rate" type="number">
+  The exchange rate applied to this transaction.
+</ResponseField>
+
+<ResponseField name="destination_amount" type="number">
+  The amount delivered or to be delivered to the receiver in `destination_currency`.
+</ResponseField>
+
+<ResponseField name="sender" type="object">
+  Details of the sender as recorded at the time the transaction was created.
+
+  <Expandable title="sender fields">
+    <ResponseField name="name" type="string">
+      Full legal name of the sender.
+    </ResponseField>
+    <ResponseField name="country" type="string">
+      ISO 3166-1 alpha-2 country code of the sender.
+    </ResponseField>
+    <ResponseField name="currency" type="string">
+      ISO 4217 source currency code.
+    </ResponseField>
+    <ResponseField name="customer_id" type="string">
+      Fable customer ID for the sender, if one was provided or created during this transaction.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="receiver" type="object">
+  Details of the receiver as recorded at the time the transaction was created.
+
+  <Expandable title="receiver fields">
+    <ResponseField name="name" type="string">
+      Full legal name of the receiver.
+    </ResponseField>
+    <ResponseField name="country" type="string">
+      ISO 3166-1 alpha-2 destination country code.
+    </ResponseField>
+    <ResponseField name="account_number" type="string">
+      Bank account number of the receiver, if applicable.
+    </ResponseField>
+    <ResponseField name="bank_code" type="string">
+      Bank identifier code, if provided.
+    </ResponseField>
+    <ResponseField name="mobile_wallet" type="string">
+      Mobile wallet identifier, if applicable.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="corridor" type="string">
+  The send–receive country pair (e.g. `US-IN`).
+</ResponseField>
+
+<ResponseField name="channel" type="string">
+  The delivery channel: `BANK_TRANSFER`, `MOBILE_WALLET`, or `CASH_PICKUP`.
+</ResponseField>
+
+<ResponseField name="reference" type="string">
+  Your internal reference ID, if one was provided at creation.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of when the transaction was created.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp of the most recent status change or update to the transaction.
+</ResponseField>
+
+<ResponseField name="delivered_at" type="string">
+  ISO 8601 timestamp of when the funds were confirmed as delivered to the receiver. Returns `null` if delivery has not yet occurred.
+</ResponseField>
+
+<ResponseField name="failure_reason" type="string">
+  Human-readable explanation of why the transaction failed. Returns `null` unless the transaction status is `FAILED`. Use `error.code` on the response body for programmatic handling.
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "transaction_id": "txn_01HZ9QKBNK3J2F4P8GRWSV7MEX",
+  "status": "DELIVERED",
+  "amount": 1000.00,
+  "source_currency": "USD",
+  "destination_currency": "INR",
+  "exchange_rate": 83.42,
+  "destination_amount": 83420.00,
+  "sender": {
+    "name": "Jane Doe",
+    "country": "US",
+    "currency": "USD",
+    "customer_id": "cust_01HZ7ABCDE1234567890ABCD"
+  },
+  "receiver": {
+    "name": "Rohan Sharma",
+    "country": "IN",
+    "account_number": "9876543210",
+    "bank_code": "HDFC0001234",
+    "mobile_wallet": null
+  },
+  "corridor": "US-IN",
+  "channel": "BANK_TRANSFER",
+  "reference": "order_20240615_001",
+  "created_at": "2024-06-15T10:30:00Z",
+  "updated_at": "2024-06-15T12:48:00Z",
+  "delivered_at": "2024-06-15T12:48:00Z",
+  "failure_reason": null
+}
+```

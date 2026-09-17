@@ -1,0 +1,199 @@
+---
+title: "Process Bulk Remittances with DigiForex"
+sidebarTitle: "Bulk Processing"
+description: "Learn how to upload and process bulk outbound remittance files using DigiForex — handling thousands of transactions in a single API call."
+---
+
+DigiForex is designed for banks and corporates that need to process hundreds or thousands of payments simultaneously — for salary disbursements, partner payouts, or bulk international transfers. Rather than creating transactions one by one, you submit an entire batch in a single API call, and DigiForex handles rate locking, compliance screening, and delivery routing for every item in the batch. This guide walks you through the complete bulk processing workflow from file preparation to reconciliation.
+
+<Steps>
+  <Step title="Prepare Your Bulk File">
+    DigiForex accepts a JSON array of transactions submitted as a structured batch payload. Each transaction in the batch must include a unique `reference`, the receiver's account details, the transfer amount, and the source currency.
+
+    ```json
+    {
+      "batch_id": "BATCH-20240115-001",
+      "corridor": "US-IN",
+      "source_currency": "USD",
+      "destination_currency": "INR",
+      "channel": "BANK_TRANSFER",
+      "transactions": [
+        {
+          "reference": "REF001",
+          "receiver_name": "Ravi Kumar",
+          "receiver_account": "123456789",
+          "bank_code": "SBIN0001234",
+          "amount": 500.00,
+          "currency": "USD",
+          "purpose": "SALARY"
+        },
+        {
+          "reference": "REF002",
+          "receiver_name": "Priya Sharma",
+          "receiver_account": "987654321",
+          "bank_code": "HDFC0002345",
+          "amount": 750.00,
+          "currency": "USD",
+          "purpose": "SALARY"
+        }
+      ]
+    }
+    ```
+
+    The `batch_id` must be unique per submission and is used for tracking and reconciliation. Use a naming convention that includes a date and sequence number (e.g., `BATCH-YYYYMMDD-NNN`) to make reconciliation easier.
+
+    <Note>
+      Bulk files are validated before processing begins. Structural errors — such as missing required fields, duplicate references within the batch, or unsupported corridors — are returned synchronously in the submission response. Fix all validation errors before resubmitting the batch.
+    </Note>
+  </Step>
+
+  <Step title="Submit the Batch">
+    Submit your batch payload to `POST /transactions/bulk`. DigiForex validates the payload, locks the exchange rate for the entire batch, and queues all transactions for processing.
+
+    ```bash
+    curl --request POST \
+      --url "https://api-sandbox.fablefintech.com/v1/transactions/bulk" \
+      --header "Authorization: Bearer <your_api_key>" \
+      --header "Content-Type: application/json" \
+      --data '{
+        "batch_id": "BATCH-20240115-001",
+        "corridor": "US-IN",
+        "source_currency": "USD",
+        "destination_currency": "INR",
+        "channel": "BANK_TRANSFER",
+        "transactions": [
+          {
+            "reference": "REF001",
+            "receiver_name": "Ravi Kumar",
+            "receiver_account": "123456789",
+            "bank_code": "SBIN0001234",
+            "amount": 500.00,
+            "currency": "USD",
+            "purpose": "SALARY"
+          },
+          {
+            "reference": "REF002",
+            "receiver_name": "Priya Sharma",
+            "receiver_account": "987654321",
+            "bank_code": "HDFC0002345",
+            "amount": 750.00,
+            "currency": "USD",
+            "purpose": "SALARY"
+          }
+        ]
+      }'
+    ```
+
+    **Response:**
+
+    ```json
+    {
+      "batch_id": "BATCH-20240115-001",
+      "status": "ACCEPTED",
+      "total_transactions": 2,
+      "locked_rate": 83.42,
+      "locked_at": "2024-01-15T10:00:00Z",
+      "estimated_completion": "2024-01-15T14:00:00Z"
+    }
+    ```
+
+    <Warning>
+      Exchange rates are fetched and locked at the time of batch submission, and the same rate applies to every transaction in the batch. If you need different rates for different subsets of transactions, submit them as separate batches.
+    </Warning>
+  </Step>
+
+  <Step title="Monitor Batch Progress">
+    Poll `GET /transactions/bulk/{batch_id}` to check the overall batch status and the per-transaction status of every item in the batch.
+
+    ```bash
+    curl --request GET \
+      --url "https://api-sandbox.fablefintech.com/v1/transactions/bulk/BATCH-20240115-001" \
+      --header "Authorization: Bearer <your_api_key>"
+    ```
+
+    **Response:**
+
+    ```json
+    {
+      "batch_id": "BATCH-20240115-001",
+      "status": "PROCESSING",
+      "total_transactions": 2,
+      "completed": 1,
+      "pending": 0,
+      "failed": 1,
+      "transactions": [
+        {
+          "reference": "REF001",
+          "transaction_id": "TXN-20240115-001",
+          "status": "DELIVERED"
+        },
+        {
+          "reference": "REF002",
+          "transaction_id": "TXN-20240115-002",
+          "status": "FAILED",
+          "failure_reason": "INVALID_ACCOUNT"
+        }
+      ]
+    }
+    ```
+
+    The batch-level `status` reflects the overall state: `ACCEPTED`, `PROCESSING`, `PARTIALLY_COMPLETED`, or `COMPLETED`. A batch moves to `COMPLETED` once all transactions have reached a terminal state (`DELIVERED`, `FAILED`, or `CANCELLED`).
+  </Step>
+
+  <Step title="Handle Exceptions">
+    Individual transactions within a batch can fail independently — for example, due to a compliance rejection or an invalid receiver account — without affecting the rest of the batch. Your integration must retrieve failed items and handle them appropriately.
+
+    To retrieve only failed transactions, filter by status in the batch response:
+
+    ```bash
+    curl --request GET \
+      --url "https://api-sandbox.fablefintech.com/v1/transactions/bulk/BATCH-20240115-001?status=FAILED" \
+      --header "Authorization: Bearer <your_api_key>"
+    ```
+
+    **Handling by failure reason:**
+
+    | Failure Reason | Action |
+    |---|---|
+    | `INVALID_ACCOUNT` | Correct the receiver account details and resubmit the item in a new batch |
+    | `COMPLIANCE_REJECTION` | Review the specific transaction; do not resubmit without compliance clearance |
+    | `DUPLICATE_REFERENCE` | The reference already exists in a previous batch; assign a new unique reference |
+    | `CORRIDOR_UNAVAILABLE` | Check corridor status and resubmit when the corridor is restored |
+
+    Resubmit failed items as a new batch with corrected details. Do not include previously successful transactions in the resubmission batch.
+  </Step>
+
+  <Step title="Reconciliation">
+    Once the batch has reached a terminal state, retrieve the reconciliation summary to confirm totals and match against your internal records.
+
+    ```bash
+    curl --request GET \
+      --url "https://api-sandbox.fablefintech.com/v1/transactions/bulk/BATCH-20240115-001/summary" \
+      --header "Authorization: Bearer <your_api_key>"
+    ```
+
+    **Response:**
+
+    ```json
+    {
+      "batch_id": "BATCH-20240115-001",
+      "status": "PARTIALLY_COMPLETED",
+      "locked_rate": 83.42,
+      "total_submitted": 2,
+      "total_delivered": 1,
+      "total_failed": 1,
+      "total_source_amount": 1250.00,
+      "total_source_currency": "USD",
+      "total_destination_amount": 41710.00,
+      "total_destination_currency": "INR",
+      "completed_at": "2024-01-15T13:45:00Z",
+      "transactions": [
+        { "reference": "REF001", "status": "DELIVERED", "amount": 500.00 },
+        { "reference": "REF002", "status": "FAILED", "amount": 750.00, "failure_reason": "INVALID_ACCOUNT" }
+      ]
+    }
+    ```
+
+    Use the `total_delivered` count and `total_source_amount` to reconcile against your ledger. For audit purposes, retain the full summary response alongside your internal batch records.
+  </Step>
+</Steps>

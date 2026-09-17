@@ -1,0 +1,109 @@
+---
+title: "POST /fx/deals — Book an FX Deal"
+sidebarTitle: "Book Deal"
+description: "POST /fx/deals — books an FX deal at the current rate for a customer. Returns a deal_id for use in transactions or utilization."
+---
+
+Book a locked FX deal for a customer using a valid `rate_id` obtained from `GET /fx/rates`. Booking a deal reserves the quoted rate for the specified amount and customer, giving you a guaranteed conversion before the underlying funds transfer takes place. Once the associated funds transfer is confirmed, mark the deal as utilized using `POST /fx/deals/{deal_id}/utilize`.
+
+## Endpoint
+
+```
+POST /fx/deals
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Request Body
+
+<ParamField body="rate_id" type="string" required>
+  The rate identifier returned by `GET /fx/rates`. The rate must still be within its validity window at the time of this request. If the rate has expired, the API returns `RATE_EXPIRED`.
+</ParamField>
+
+<ParamField body="from_currency" type="string" required>
+  ISO 4217 currency code of the currency being converted from. Must match the `from_currency` used when fetching the rate.
+</ParamField>
+
+<ParamField body="to_currency" type="string" required>
+  ISO 4217 currency code of the currency being converted to. Must match the `to_currency` used when fetching the rate.
+</ParamField>
+
+<ParamField body="amount" type="number" required>
+  The amount in `from_currency` to convert. Must be a positive number and within the minimum and maximum deal sizes for your account tier.
+</ParamField>
+
+<ParamField body="customer_id" type="string" required>
+  The Fable customer ID of the individual or entity for whom the deal is being booked. The customer must have a completed KYC record.
+</ParamField>
+
+<ParamField body="deal_type" type="string" required>
+  The classification of the deal. One of:
+  - `INDIVIDUAL` — a deal for a retail customer.
+  - `CORPORATE` — a deal for a business entity.
+  - `PARTNER_BANK` — a deal booked on behalf of a partner financial institution.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api-sandbox.fablefintech.com/v1/fx/deals \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rate_id": "rate_01HZ8MKBNK3J2F4P8GRWSV7AAX",
+    "from_currency": "USD",
+    "to_currency": "INR",
+    "amount": 1000.00,
+    "customer_id": "cust_01HZ7ABCDE1234567890ABCD",
+    "deal_type": "INDIVIDUAL"
+  }'
+```
+
+## Response Fields
+
+<ResponseField name="deal_id" type="string">
+  Unique identifier for the booked FX deal. Use this ID when utilizing the deal via `POST /fx/deals/{deal_id}/utilize`.
+</ResponseField>
+
+<ResponseField name="deal_status" type="string">
+  Current status of the deal. Always `BOOKED` immediately after creation. Transitions to `UTILIZED` once utilized and to `EXPIRED` if not utilized before `expires_at`.
+</ResponseField>
+
+<ResponseField name="from_currency" type="string">
+  ISO 4217 code of the source currency for this deal.
+</ResponseField>
+
+<ResponseField name="to_currency" type="string">
+  ISO 4217 code of the destination currency for this deal.
+</ResponseField>
+
+<ResponseField name="rate" type="number">
+  The locked exchange rate applied to this deal.
+</ResponseField>
+
+<ResponseField name="amount" type="number">
+  The source amount covered by this deal.
+</ResponseField>
+
+<ResponseField name="expires_at" type="string">
+  ISO 8601 timestamp after which the deal can no longer be utilized. Deals that are not utilized before this time transition to `EXPIRED`.
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "deal_id": "deal_01HZABCDE9876543210FGHIJ",
+  "deal_status": "BOOKED",
+  "from_currency": "USD",
+  "to_currency": "INR",
+  "rate": 83.42,
+  "amount": 1000.00,
+  "expires_at": "2024-06-16T10:30:00Z"
+}
+```

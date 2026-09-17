@@ -1,0 +1,102 @@
+---
+title: "FX Rates and Currency Exchange in Fable Fintech"
+sidebarTitle: "FX & Rates"
+description: "Learn how Fable Fintech fetches live FX rates, locks exchange rates for transactions, and manages deal booking for cross-border payments."
+---
+
+FX rate management is a core part of cross-border payments, and getting it right directly affects both your customers' trust and your business's margins. Fable Fintech provides a complete FX rate layer through its API — covering real-time rate fetching, short-window rate locking for transaction integrity, and structured FX deal booking for larger or time-sensitive transfers. Whether you are building a consumer remittance flow that needs a live indicative rate on the quote screen, or a treasury operation that needs to lock a specific rate before moving a large sum, Fable's FX API has you covered.
+
+## Live Rate Fetching
+
+Use the `GET /fx/rates` endpoint to fetch the current exchange rate for any supported currency pair. This endpoint returns the live rate as calculated from Fable's interbank feed and the rate markup configured for your account. The response also includes a `rate_id` and a `valid_until` timestamp, both of which are essential if you intend to lock this rate for a transaction.
+
+```bash
+curl -H "Authorization: Bearer $FABLE_API_KEY" \
+  "https://api.fablefintech.com/v1/fx/rates?from=USD&to=INR"
+```
+
+The response returns the current mid-market rate adjusted for your configured markup, along with a short validity window:
+
+```json
+{
+  "from_currency": "USD",
+  "to_currency": "INR",
+  "rate": 83.25,
+  "valid_until": "2024-01-15T10:35:00Z",
+  "rate_id": "RATE-20240115-XYZ789"
+}
+```
+
+| Field            | Type   | Description                                                                              |
+|------------------|--------|------------------------------------------------------------------------------------------|
+| `from_currency`  | string | ISO 4217 source currency code.                                                           |
+| `to_currency`    | string | ISO 4217 destination currency code.                                                      |
+| `rate`           | number | Exchange rate including your configured markup. Units of `to_currency` per 1 `from_currency`. |
+| `valid_until`    | string | ISO 8601 UTC timestamp. The rate is guaranteed only until this time.                     |
+| `rate_id`        | string | Unique identifier for this rate quote. Pass this in transaction requests to lock the rate.|
+
+You can fetch rates for multiple currency pairs in a single request by passing a comma-separated list to the `to` parameter:
+
+```bash
+curl -H "Authorization: Bearer $FABLE_API_KEY" \
+  "https://api.fablefintech.com/v1/fx/rates?from=USD&to=INR,PHP,PKR,BDT"
+```
+
+<Tip>
+  Always check the `valid_until` field before submitting a transaction that references a locked rate. If the current time is past `valid_until`, the `rate_id` will be rejected and you must fetch a fresh rate before proceeding. Build this check into your transaction submission flow to prevent avoidable errors.
+</Tip>
+
+## Rate Locking
+
+When you create a transaction, you can lock the rate you quoted to your customer by including the `rate_id` from a prior `/fx/rates` response in your transaction request. This guarantees that the destination amount your customer saw on the quote screen is the amount the recipient receives — regardless of any market movement between the time of the quote and the time of processing.
+
+Rate locks are valid for a short window — typically **60 seconds** from the time the rate was fetched. This window is intentionally short to limit Fable's and your exposure to adverse market movements between quoting and booking.
+
+Include the `rate_id` in your transaction body as follows:
+
+```json
+{
+  "corridor": "US-IN",
+  "channel": "BANK_TRANSFER",
+  "source_currency": "USD",
+  "destination_currency": "INR",
+  "source_amount": 500.00,
+  "rate_id": "RATE-20240115-XYZ789",
+  "recipient_id": "RCP-20240115-DEF456"
+}
+```
+
+If the `rate_id` is valid and has not expired, the platform will process the transaction at the locked rate and return `destination_amount` calculated using that rate in the transaction response. If the `rate_id` has expired, the API returns a `422 RATE_EXPIRED` error and you must fetch a new rate and re-submit.
+
+<Note>
+  If you omit the `rate_id` from a transaction request, Fable will apply the live market rate at the time of processing. In fast-moving markets, this can result in a different destination amount than what you showed the customer. For consumer-facing products, always lock the rate.
+</Note>
+
+## FX Deal Booking
+
+For larger transfers, treasury operations, or any scenario where you need to secure a specific rate for a future transaction, Fable's **DigiBureau** product enables structured FX deal booking. Rather than relying on the short-window rate lock available on standard transactions, DigiBureau allows you to book a named FX deal at a specific rate for a specific tenor — giving you rate certainty well in advance of the actual transfer.
+
+Key capabilities of FX deal booking via DigiBureau include:
+
+- **Forward rate booking** — Lock a rate for a future value date, protecting against adverse currency moves.
+- **Bulk deal management** — Book and manage multiple FX deals across currency pairs from a single interface.
+- **Deal-to-transaction linking** — Link a booked deal to one or more transactions so the correct rate is applied automatically at the time of processing.
+- **Deal status tracking** — Monitor deal status, utilisation, and expiry through the DigiBureau API or dashboard.
+
+For a full guide to creating and managing FX deals, see the [DigiBureau product documentation](/products/digibureau).
+
+## Rate Markup
+
+The rates returned by `GET /fx/rates` already include the **rate markup** configured for your Fable account. The markup is a spread applied on top of the interbank mid-market rate. It represents the margin built into the exchange rate presented to your end customers, and is how many Fable customers generate FX revenue from their remittance or payment products.
+
+Rate markups are configurable at multiple levels:
+
+- **Account-level default** — A single markup applied across all currency pairs and corridors.
+- **Corridor-level override** — Different markups for different corridors, allowing you to be more competitive on high-volume routes and apply wider spreads on less liquid pairs.
+- **Customer segment override** — Apply different markups for different customer tiers (e.g., premium customers, corporate accounts) via customer group configuration.
+
+<Note>
+  The raw interbank rate used as the base for markup calculations is not exposed via the API. Only the post-markup rate is returned. For markup configuration, reconciliation, and margin reporting, contact your Fable account team.
+</Note>
+
+Markups are applied consistently and transparently — the rate shown to your customer via the API is the rate that will be used for the transaction when a `rate_id` is locked. There are no hidden adjustments between quote and execution.

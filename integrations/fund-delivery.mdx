@@ -1,0 +1,65 @@
+---
+title: "Fund Delivery Network Integrations"
+sidebarTitle: "Fund Delivery"
+description: "Fable Fintech connects to global fund delivery networks — including Mastercard, TerraPay, and SWIFT — to pay out recipients in 100+ countries."
+---
+
+Fund delivery is the final step in a remittance transaction — getting money to the recipient through the most appropriate local network in their country. Fable connects to a curated set of global and regional delivery networks, covering bank account credit, mobile wallets, card payouts, and cash pickup through agent networks. Your implementation team works with Fable to activate the right delivery networks for each receive corridor, ensuring recipients get paid through the channel they actually use.
+
+## Supported Delivery Networks
+
+**Mastercard Send**
+Mastercard Send is a global card-based payout network that delivers funds directly to a recipient's Mastercard-branded debit card in real time. It is available in a large number of countries and is particularly effective for corridors where card penetration is high. Recipients do not need a bank account — only a linked debit card.
+
+**TerraPay**
+TerraPay specialises in digital wallet and mobile money payouts across Africa, Asia, and emerging markets. It connects to a wide network of mobile money operators and digital wallets, enabling payouts to recipients who may not have traditional bank accounts. TerraPay is a strong delivery option for high-volume retail corridors into sub-Saharan Africa and South and Southeast Asia.
+
+**SWIFT**
+SWIFT-based delivery credits funds directly to a recipient's bank account via the global SWIFT messaging network. It is the standard mechanism for bank-to-bank delivery in countries with well-developed banking infrastructure and is used for both retail remittances and institutional transfers.
+
+**iPay**
+iPay is a digital payment delivery network supporting payouts to bank accounts and digital wallets in its supported corridors. It provides an additional delivery option for specific regional markets and can be configured alongside other delivery networks.
+
+**Additional Regional Networks**
+Beyond the core delivery partners listed above, Fable supports additional regional networks tailored to specific corridors. These include local bank transfer schemes, agent-based cash payout networks, and country-specific wallet integrations. Your account manager can advise on available delivery options for the corridors you operate.
+
+## Delivery Methods
+
+Fable supports four delivery method types across its delivery network integrations. Each is suited to different recipient profiles and destination markets.
+
+<CardGroup cols={2}>
+  <Card title="Bank Account Credit" icon="building-columns">
+    Transfer funds directly to a recipient's bank account using SWIFT or local bank transfer schemes. Best for corridors with high banking penetration and recipients who prefer account-based delivery.
+  </Card>
+  <Card title="Mobile Wallet Top-Up" icon="mobile-screen">
+    Credit a recipient's mobile money or digital wallet account via networks like TerraPay. Ideal for markets where mobile money adoption exceeds traditional banking — common across Africa and parts of Asia.
+  </Card>
+  <Card title="Card Payout" icon="credit-card">
+    Push funds directly to a recipient's debit card in real time using Mastercard Send. No bank account required — suitable for card-holding recipients who want instant access to funds.
+  </Card>
+  <Card title="Cash Pickup" icon="hand-holding-dollar">
+    Enable recipients to collect cash from a local agent location. Funds are typically available within minutes of the transaction being confirmed, subject to agent network coverage and operating hours.
+  </Card>
+</CardGroup>
+
+## Delivery Times
+
+Expected delivery times vary by network, destination country, and the outcome of compliance checks. The table below reflects typical times under normal operating conditions.
+
+| Delivery Method | Typical Delivery Time |
+|---|---|
+| **Mastercard Send** (card payout) | Real-time (seconds) |
+| **Mobile wallet** (TerraPay) | Real-time (seconds to minutes) |
+| **Cash pickup** (agent network) | Minutes, with agent confirmation |
+| **SWIFT** (bank account credit) | 1–3 business days |
+| **Local bank transfer** (regional) | Same day to next business day |
+
+<Note>
+  Delivery times depend on the destination country, the delivery network used, and the outcome of compliance and sanctions screening checks. Transactions flagged for manual review may be held until cleared. Fable will surface the expected delivery time for a transaction at the point of quote, based on the configured delivery network for that corridor.
+</Note>
+
+## Configuring Delivery Networks
+
+Delivery networks are activated per receive corridor during your onboarding with Fable. You specify the delivery method and network on each transaction request. Where multiple delivery methods are available in a corridor, you can present the options to senders at the point of transaction and pass the selected method in the request.
+
+Your implementation team will document the specific fields required for each delivery method — for example, bank account and routing details for SWIFT delivery, or wallet ID for mobile money payouts.

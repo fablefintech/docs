@@ -1,0 +1,247 @@
+---
+title: "Java SDK for Fable Fintech"
+sidebarTitle: "Java"
+description: "Use the Fable Fintech Java SDK with Maven or Gradle to integrate remittance transactions, FX deals, and compliance into your JVM application."
+---
+
+The Fable Fintech Java SDK is a strongly-typed client library for JVM applications, supporting both synchronous calls and `CompletableFuture`-based async patterns. It is built with Java 11 and is compatible with Spring Boot, Jakarta EE, and Android (API 26+). All request and response models use the builder pattern for readable, IDE-friendly construction.
+
+## Installation
+
+<CodeGroup>
+
+```xml Maven
+<dependency>
+  <groupId>com.fablefintech</groupId>
+  <artifactId>fable-sdk</artifactId>
+  <version>1.0.0</version>
+</dependency>
+```
+
+```gradle Gradle
+implementation 'com.fablefintech:fable-sdk:1.0.0'
+```
+
+</CodeGroup>
+
+## Initialization
+
+Build a `FableClient` instance once at application startup — it is thread-safe and designed to be shared across your application.
+
+```java
+import com.fablefintech.FableClient;
+import com.fablefintech.model.Environment;
+
+FableClient client = FableClient.builder()
+    .apiKey(System.getenv("FABLE_API_KEY"))
+    .environment(Environment.SANDBOX) // or Environment.PRODUCTION
+    .build();
+```
+
+<Note>
+  Store your API key in an environment variable or a secrets manager such as AWS Secrets Manager or Spring Cloud Config. Do not hard-code credentials in your source code.
+</Note>
+
+## Creating a Transaction
+
+Build a `CreateTransactionRequest` using the nested builders, then call `client.transactions().create()`. The method returns a `Transaction` object with the assigned `transactionId` and initial `status`.
+
+```java
+import com.fablefintech.model.*;
+import java.math.BigDecimal;
+
+CreateTransactionRequest request = CreateTransactionRequest.builder()
+    .sender(Sender.builder()
+        .name("John Doe")
+        .country("US")
+        .currency("USD")
+        .build())
+    .receiver(Receiver.builder()
+        .name("Jane Smith")
+        .country("IN")
+        .accountNumber("123456789012")
+        .bankCode("HDFC0001234")
+        .build())
+    .amount(BigDecimal.valueOf(500))
+    .sourceCurrency("USD")
+    .destinationCurrency("INR")
+    .corridor("US-IN")
+    .channel(Channel.BANK_TRANSFER)
+    .build();
+
+Transaction transaction = client.transactions().create(request);
+System.out.println(transaction.getTransactionId());
+// TXN-2024-ABCD1234
+```
+
+## Fetching FX Rates
+
+Call `client.fx().getRate()` with the source and destination currency codes to retrieve the current live rate and its expiry timestamp.
+
+```java
+import com.fablefintech.model.FxRate;
+
+FxRate rate = client.fx().getRate("USD", "INR");
+System.out.printf("Rate: %s, valid until: %s%n", rate.getRate(), rate.getValidUntil());
+// Rate: 83.42, valid until: 2024-07-15T10:30:00Z
+```
+
+## Polling Transaction Status
+
+Check the current state of a transaction by calling `client.transactions().getStatus()`.
+
+```java
+import com.fablefintech.model.TransactionStatus;
+
+TransactionStatus status = client.transactions().getStatus(transaction.getTransactionId());
+System.out.println(status.getStatus());
+// PROCESSING
+```
+
+<Tip>
+  Rather than polling in a loop, register a webhook with `client.webhooks().register()` to receive asynchronous push notifications when a transaction status changes.
+</Tip>
+
+## Booking and Utilizing an FX Deal
+
+Lock in a rate by booking a deal through DigiBureau, then reference the deal ID when creating the transaction, and mark it utilized after the transaction is confirmed.
+
+```java
+import com.fablefintech.model.*;
+import java.math.BigDecimal;
+
+// Book a deal to lock the current rate
+BookDealRequest dealRequest = BookDealRequest.builder()
+    .fromCurrency("USD")
+    .toCurrency("INR")
+    .amount(BigDecimal.valueOf(500))
+    .corridor("US-IN")
+    .build();
+
+FxDeal deal = client.fx().bookDeal(dealRequest);
+System.out.printf("Deal: %s, expires at: %s%n", deal.getDealId(), deal.getExpiresAt());
+
+// Create the transaction referencing the booked deal
+CreateTransactionRequest txRequest = CreateTransactionRequest.builder()
+    .sender(Sender.builder().name("John Doe").country("US").currency("USD").build())
+    .receiver(Receiver.builder()
+        .name("Jane Smith")
+        .country("IN")
+        .accountNumber("123456789012")
+        .bankCode("HDFC0001234")
+        .build())
+    .amount(BigDecimal.valueOf(500))
+    .sourceCurrency("USD")
+    .destinationCurrency("INR")
+    .corridor("US-IN")
+    .channel(Channel.BANK_TRANSFER)
+    .fxDealId(deal.getDealId())
+    .build();
+
+Transaction transaction = client.transactions().create(txRequest);
+
+// Mark the deal as utilized
+UtilizeDealRequest utilizeRequest = UtilizeDealRequest.builder()
+    .transactionId(transaction.getTransactionId())
+    .build();
+client.fx().utilizeDeal(deal.getDealId(), utilizeRequest);
+```
+
+## Running Compliance Checks
+
+### KYC Submission
+
+```java
+import com.fablefintech.model.*;
+
+KycRequest kycRequest = KycRequest.builder()
+    .customerId("CUST-001")
+    .fullName("John Doe")
+    .dateOfBirth("1990-01-15")
+    .nationality("US")
+    .idType(IdType.PASSPORT)
+    .idNumber("A12345678")
+    .idExpiry("2030-01-15")
+    .build();
+
+KycResult kycResult = client.compliance().submitKyc(kycRequest);
+System.out.println(kycResult.getStatus()); // APPROVED, PENDING, REJECTED
+```
+
+### AML Screening
+
+```java
+AmlRequest amlRequest = AmlRequest.builder()
+    .customerId("CUST-001")
+    .fullName("John Doe")
+    .dateOfBirth("1990-01-15")
+    .nationality("US")
+    .build();
+
+AmlResult amlResult = client.compliance().runAmlScreening(amlRequest);
+System.out.println(amlResult.getRiskLevel()); // LOW, MEDIUM, HIGH
+```
+
+## Registering a Webhook
+
+```java
+import com.fablefintech.model.*;
+import java.util.List;
+
+RegisterWebhookRequest webhookRequest = RegisterWebhookRequest.builder()
+    .url("https://your-app.com/webhooks/fable")
+    .events(List.of("transaction.completed", "transaction.failed", "kyc.status_changed"))
+    .secret(System.getenv("WEBHOOK_SECRET"))
+    .build();
+
+Webhook webhook = client.webhooks().register(webhookRequest);
+System.out.println(webhook.getWebhookId() + " " + webhook.getStatus());
+```
+
+## Error Handling
+
+The SDK throws `FableApiException` for any non-2xx API response. The exception provides structured access to the error code, HTTP status, and request ID.
+
+```java
+import com.fablefintech.exception.FableApiException;
+
+try {
+    Transaction tx = client.transactions().create(request);
+} catch (FableApiException e) {
+    System.err.println("Error: " + e.getCode() + " - " + e.getMessage());
+    System.err.println("HTTP status: " + e.getHttpStatus());
+    System.err.println("Request ID: " + e.getRequestId());
+}
+```
+
+Common error codes you may encounter:
+
+| Code | HTTP Status | Description |
+|---|---|---|
+| `INVALID_CORRIDOR` | 400 | The specified corridor is not supported. |
+| `KYC_REQUIRED` | 403 | Sender KYC must be completed before transacting. |
+| `DEAL_EXPIRED` | 409 | The referenced FX deal has expired. |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests — the SDK will retry automatically. |
+| `INTERNAL_ERROR` | 500 | Unexpected server error — contact support with the `requestId`. |
+
+## Async Usage with CompletableFuture
+
+Every synchronous method has an async counterpart suffixed with `Async` that returns `CompletableFuture<T>`.
+
+```java
+import java.util.concurrent.CompletableFuture;
+import com.fablefintech.model.*;
+
+CompletableFuture<FxRate> rateFuture = client.fx().getRateAsync("USD", "INR");
+CompletableFuture<Transaction> txFuture = rateFuture.thenCompose(rate -> {
+    System.out.printf("Locked rate: %s%n", rate.getRate());
+    return client.transactions().createAsync(request);
+});
+
+txFuture.thenAccept(tx ->
+    System.out.println("Transaction created: " + tx.getTransactionId())
+).exceptionally(ex -> {
+    System.err.println("Failed: " + ex.getMessage());
+    return null;
+});
+```

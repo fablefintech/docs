@@ -1,0 +1,128 @@
+---
+title: "POST /compliance/kyc — Submit KYC Verification"
+sidebarTitle: "KYC Verification"
+description: "POST /compliance/kyc — submits customer identity data for KYC verification via Fable's integrated identity verification providers."
+---
+
+Submit a customer's identity information for KYC (Know Your Customer) verification before they initiate a transaction. Fable routes the verification request to your configured identity verification provider and returns a `verification_id` along with an initial status. Customers must reach `APPROVED` status before they can send funds through the Fable platform.
+
+## Endpoint
+
+```
+POST /compliance/kyc
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Request Body
+
+<ParamField body="customer_id" type="string" required>
+  Your unique identifier for the customer within your system. Fable uses this to link the KYC record to subsequent transactions submitted with the same `customer_id`.
+</ParamField>
+
+<ParamField body="full_name" type="string" required>
+  The customer's full legal name, exactly as it appears on their identity document.
+</ParamField>
+
+<ParamField body="date_of_birth" type="string" required>
+  The customer's date of birth in ISO 8601 date format (e.g. `1985-03-22`).
+</ParamField>
+
+<ParamField body="nationality" type="string" required>
+  ISO 3166-1 alpha-2 country code representing the customer's nationality (e.g. `US`, `IN`, `GB`).
+</ParamField>
+
+<ParamField body="id_type" type="string" required>
+  The type of identity document being submitted. One of:
+  - `PASSPORT` — international travel passport.
+  - `NATIONAL_ID` — government-issued national identity card.
+  - `DRIVERS_LICENSE` — government-issued driver's license.
+</ParamField>
+
+<ParamField body="id_number" type="string" required>
+  The document number as printed on the identity document.
+</ParamField>
+
+<ParamField body="id_expiry" type="string" required>
+  The expiry date of the identity document in ISO 8601 date format (e.g. `2029-08-31`). Expired documents will cause the verification to be rejected.
+</ParamField>
+
+<ParamField body="address" type="object">
+  The customer's current residential address. Providing address information improves match rates with verification providers.
+
+  <Expandable title="address fields">
+    <ParamField body="street" type="string">
+      Street address line, including house number and street name.
+    </ParamField>
+    <ParamField body="city" type="string">
+      City or town.
+    </ParamField>
+    <ParamField body="country" type="string">
+      ISO 3166-1 alpha-2 country code of the residential address.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api-sandbox.fablefintech.com/v1/compliance/kyc \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cust_01HZ7ABCDE1234567890ABCD",
+    "full_name": "Jane Elizabeth Doe",
+    "date_of_birth": "1985-03-22",
+    "nationality": "US",
+    "id_type": "PASSPORT",
+    "id_number": "A12345678",
+    "id_expiry": "2029-08-31",
+    "address": {
+      "street": "123 Main Street",
+      "city": "New York",
+      "country": "US"
+    }
+  }'
+```
+
+## Response Fields
+
+<ResponseField name="verification_id" type="string">
+  Unique identifier for this KYC verification request. Use this to look up the verification result or cross-reference with webhook events.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The current status of the KYC verification. See the status values table below.
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  The customer ID as provided in the request, confirming the record has been linked.
+</ResponseField>
+
+## Status Values
+
+| Status | Description |
+|--------|-------------|
+| `PENDING` | The verification request has been submitted and is being processed by the identity verification provider. Check back shortly or wait for the `compliance.kyc_completed` webhook event. |
+| `APPROVED` | The customer's identity has been successfully verified. They may now initiate transactions. |
+| `REJECTED` | The verification failed — the document may be invalid, expired, or the data provided did not match the document. The customer must resubmit with corrected information. |
+| `REVIEW_REQUIRED` | The automated check was inconclusive. The record has been flagged for manual review by the Fable compliance team. Processing times vary. |
+
+## Example Response
+
+```json
+{
+  "verification_id": "kyc_01HZXYZ9876543210ABCDEFG",
+  "status": "PENDING",
+  "customer_id": "cust_01HZ7ABCDE1234567890ABCD"
+}
+```
+
+<Note>
+  The identity verification provider used to process this request is determined by your Fable integration settings. Different providers may have different turnaround times and document support. Contact your account manager if you need to change your configured provider or add support for additional document types or countries.
+</Note>

@@ -1,31 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Fable Fintech",
+  "projectType": "saas",
+  "projectName": "Fable Fintech",
+  "projectDescription": "Fable Fintech provides bank-grade cross-border remittance and payments infrastructure — including APIs, SDKs, and turnkey products — for banks, exchange houses, and SME payment providers worldwide.",
   "theme": "luma",
-  "logo": {
-    "light": "https://media.brand.dev/eef1b65e-4395-4a89-a667-c2d8bfd22b21.svg",
-    "dark": "https://media.brand.dev/eef1b65e-4395-4a89-a667-c2d8bfd22b21.svg"
-  },
-  "favicon": "/favicon.svg",
-  "colors": {
-    "primary": "#0d6efd",
-    "light": "#0c244c"
-  },
-  "font": {
-    "headings": {
-      "family": "Figtree"
-    },
-    "body": {
-      "family": "Merriweather Sans"
-    }
-  },
-  "navbar": {
-    "primary": {
-      "type": "button",
-      "label": "Request a Demo",
-      "href": "https://www.fablefintech.com/contact"
-    }
-  },
+  "primaryColor": "#0d6efd",
+  "lightColor": "#0c244c",
+  "darkColor": null,
   "navigation": {
     "tabs": [
       {
@@ -150,9 +130,32 @@
       }
     ]
   },
-  "footer": {
-    "socials": {
-      "linkedin": "https://www.linkedin.com/company/fablefintech"
-    }
-  }
+  "keyFeatures": [
+    "P2P inward and outward remittance (DigiRemit)",
+    "High-volume bulk outbound remittance processing (DigiForex)",
+    "Bulk inbound remittance from global MTOs (LastMile)",
+    "Cross-border SME business payments (BizPay)",
+    "End-to-end FX deal booking and utilization (DigiBureau)",
+    "Unified exchange house / MTO platform (Ex-Core)",
+    "Global exchange house acceleration platform (ConnectX)",
+    "100+ pre-tested integrations across payment ecosystem",
+    "Inbuilt 4-Eye and 6-Eye compliance workflows",
+    "SWIFT automation and multi-corridor support",
+    "30-day deployment with omnichannel architecture",
+    "Fortress-level AML, KYC, and sanctions compliance"
+  ],
+  "publicApiSurface": [
+    "POST /transactions — create remittance transaction",
+    "GET /transactions/{id} — retrieve transaction details",
+    "DELETE /transactions/{id} — cancel transaction",
+    "GET /transactions/{id}/status — poll transaction status",
+    "GET /fx/rates — fetch live FX exchange rates",
+    "POST /fx/deals — book an FX deal",
+    "POST /fx/deals/{id}/utilize — utilize a booked FX deal",
+    "POST /compliance/kyc — submit KYC verification",
+    "POST /compliance/aml — run AML screening",
+    "POST /compliance/sanctions — run sanctions check",
+    "POST /webhooks — register webhook endpoint",
+    "GET /webhooks/events — list webhook event types"
+  ]
 }

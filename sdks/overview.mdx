@@ -1,0 +1,143 @@
+---
+title: "Fable Fintech SDK Overview"
+sidebarTitle: "Overview"
+description: "The Fable Fintech SDK is available for JavaScript, Python, and Java — providing idiomatic wrappers around the REST API with built-in auth and error handling."
+---
+
+The Fable Fintech SDK provides idiomatic client libraries for JavaScript/TypeScript, Python, and Java. Each library wraps the REST API with typed methods, automatic authentication, and structured error handling — so you spend less time wiring HTTP calls and more time building your product.
+
+<CardGroup cols={3}>
+  <Card title="JavaScript & TypeScript" icon="js" href="/sdks/javascript">
+    Install `@fable-fintech/sdk` via npm and use async/await patterns in Node.js or browser environments.
+  </Card>
+  <Card title="Python" icon="python" href="/sdks/python">
+    Install `fable-fintech` via pip and use synchronous or async clients with dataclass-based response models.
+  </Card>
+  <Card title="Java" icon="java" href="/sdks/java">
+    Add `com.fablefintech:fable-sdk` via Maven or Gradle and use the builder pattern with CompletableFuture support.
+  </Card>
+</CardGroup>
+
+## Features
+
+Every Fable SDK ships with the same core capabilities regardless of language:
+
+- **Type safety** — All request parameters and response fields are fully typed. Your IDE will autocomplete field names and catch mismatches before you ship.
+- **Automatic token injection** — Pass your API key once at initialization. Every subsequent request is authenticated automatically via the `Authorization: Bearer` header.
+- **Retry logic** — The SDK automatically retries transient network errors and rate-limit responses (HTTP 429, 503) with exponential backoff, so your integration is resilient by default.
+- **Structured exceptions** — API errors surface as typed exceptions (`FableApiError` / `FableApiException`) containing the error code, HTTP status, and human-readable message rather than raw HTTP responses.
+- **Async support** — All three SDKs support non-blocking execution: `async/await` in JavaScript, `AsyncFableClient` in Python, and `CompletableFuture` in Java.
+- **Sandbox / production toggle** — Switch between environments with a single `environment` flag at initialization — no URL changes required.
+
+## Choosing a Library
+
+| Environment | Recommended SDK |
+|---|---|
+| Node.js backend (API server, Lambda, Edge) | JavaScript / TypeScript |
+| Browser (React, Vue, Svelte) | JavaScript / TypeScript |
+| Python backend (Django, FastAPI, Flask) | Python |
+| Data pipelines and scripting | Python |
+| Spring Boot / Jakarta EE | Java |
+| Android or other JVM targets | Java |
+
+## Quick Start
+
+The example below shows the simplest possible usage — creating a transaction — in all three languages.
+
+<CodeGroup>
+
+```typescript JavaScript
+import { FableClient } from '@fable-fintech/sdk';
+
+const fable = new FableClient({
+  apiKey: process.env.FABLE_API_KEY,
+  environment: 'sandbox',
+});
+
+const transaction = await fable.transactions.create({
+  sender: { name: 'John Doe', country: 'US', currency: 'USD' },
+  receiver: {
+    name: 'Jane Smith',
+    country: 'IN',
+    account_number: '123456789012',
+    bank_code: 'HDFC0001234',
+  },
+  amount: 500,
+  source_currency: 'USD',
+  destination_currency: 'INR',
+  corridor: 'US-IN',
+  channel: 'BANK_TRANSFER',
+});
+
+console.log(transaction.transaction_id, transaction.status);
+```
+
+```python Python
+from fable_fintech import FableClient
+
+client = FableClient(
+    api_key="your_api_key",
+    environment="sandbox",
+)
+
+transaction = client.transactions.create(
+    sender={"name": "John Doe", "country": "US", "currency": "USD"},
+    receiver={
+        "name": "Jane Smith",
+        "country": "IN",
+        "account_number": "123456789012",
+        "bank_code": "HDFC0001234",
+    },
+    amount=500.00,
+    source_currency="USD",
+    destination_currency="INR",
+    corridor="US-IN",
+    channel="BANK_TRANSFER",
+)
+
+print(transaction.transaction_id, transaction.status)
+```
+
+```java Java
+import com.fablefintech.FableClient;
+import com.fablefintech.model.*;
+
+FableClient client = FableClient.builder()
+    .apiKey(System.getenv("FABLE_API_KEY"))
+    .environment(Environment.SANDBOX)
+    .build();
+
+CreateTransactionRequest request = CreateTransactionRequest.builder()
+    .sender(Sender.builder().name("John Doe").country("US").currency("USD").build())
+    .receiver(Receiver.builder()
+        .name("Jane Smith")
+        .country("IN")
+        .accountNumber("123456789012")
+        .bankCode("HDFC0001234")
+        .build())
+    .amount(BigDecimal.valueOf(500))
+    .sourceCurrency("USD")
+    .destinationCurrency("INR")
+    .corridor("US-IN")
+    .channel(Channel.BANK_TRANSFER)
+    .build();
+
+Transaction transaction = client.transactions().create(request);
+System.out.println(transaction.getTransactionId());
+```
+
+</CodeGroup>
+
+## API Coverage
+
+All three SDKs provide complete coverage of the Fable REST API surface:
+
+| Category | Operations |
+|---|---|
+| **Transactions** | Create transaction, get transaction, get transaction status, cancel transaction |
+| **FX Rates** | Get live FX rate, get rate history |
+| **FX Deals** | Book FX deal, get deal details, mark deal as utilized |
+| **Compliance — KYC** | Submit KYC documents, get KYC status |
+| **Compliance — AML** | Run AML screening, retrieve screening result |
+| **Compliance — Sanctions** | Run sanctions check |
+| **Webhooks** | Register endpoint, list endpoints, delete endpoint |

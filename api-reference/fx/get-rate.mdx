@@ -1,0 +1,85 @@
+---
+title: "GET /fx/rates — Fetch Live Exchange Rates"
+sidebarTitle: "Get Rate"
+description: "GET /fx/rates — returns the current exchange rate for a currency pair. Returns a rate_id that can be locked in a transaction or FX deal."
+---
+
+Fetch the current FX rate for a currency pair before initiating a transaction or booking an FX deal. The response includes a `rate_id` that you can pass to `POST /transactions` or `POST /fx/deals` to lock in the quoted rate. If you do not include a `rate_id` when creating a transaction, the prevailing rate at the time of processing is applied instead.
+
+## Endpoint
+
+```
+GET /fx/rates
+```
+
+## Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer <your_api_key>` |
+| `Content-Type` | `application/json` |
+
+## Query Parameters
+
+<ParamField query="from" type="string" required>
+  ISO 4217 currency code of the source currency (e.g. `USD`, `GBP`, `EUR`).
+</ParamField>
+
+<ParamField query="to" type="string" required>
+  ISO 4217 currency code of the destination currency (e.g. `INR`, `MXN`, `PHP`).
+</ParamField>
+
+<ParamField query="amount" type="number">
+  An indicative amount in the source currency. When provided, the response includes the estimated `destination_amount`. This field does not affect the rate itself but is useful for quoting purposes.
+</ParamField>
+
+## Example Request
+
+```bash
+curl "https://api-sandbox.fablefintech.com/v1/fx/rates?from=USD&to=INR&amount=1000" \
+  -H "Authorization: Bearer fbl_test_sk_1a2b3c4d5e6f7g8h9i0j" \
+  -H "Content-Type: application/json"
+```
+
+## Response Fields
+
+<ResponseField name="from_currency" type="string">
+  ISO 4217 code of the source currency, as requested.
+</ResponseField>
+
+<ResponseField name="to_currency" type="string">
+  ISO 4217 code of the destination currency, as requested.
+</ResponseField>
+
+<ResponseField name="rate" type="number">
+  The mid-market exchange rate expressed as units of `to_currency` per one unit of `from_currency`.
+</ResponseField>
+
+<ResponseField name="indicative_destination_amount" type="number">
+  The estimated amount in `to_currency` for the requested `amount`. Only present when `amount` is included in the request.
+</ResponseField>
+
+<ResponseField name="valid_until" type="string">
+  ISO 8601 timestamp indicating when the rate — and the `rate_id` — will expire. After this time, the `rate_id` cannot be used in a transaction or deal and you must fetch a fresh rate.
+</ResponseField>
+
+<ResponseField name="rate_id" type="string">
+  A unique identifier for this rate quote. Pass this value as `rate_id` in `POST /transactions` or `POST /fx/deals` to lock the quoted rate.
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "from_currency": "USD",
+  "to_currency": "INR",
+  "rate": 83.42,
+  "indicative_destination_amount": 83420.00,
+  "valid_until": "2024-06-15T10:31:00Z",
+  "rate_id": "rate_01HZ8MKBNK3J2F4P8GRWSV7AAX"
+}
+```
+
+<Note>
+  Rate IDs are valid for approximately **60 seconds** from the time of issue, as indicated by the `valid_until` timestamp. Fetch a new rate immediately before creating a transaction or booking a deal to minimize the chance of expiry between the quote and the submission. If a rate expires, the API returns `RATE_EXPIRED` — simply fetch a fresh rate and retry.
+</Note>

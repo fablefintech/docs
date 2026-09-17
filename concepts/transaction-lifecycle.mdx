@@ -1,0 +1,175 @@
+---
+title: "Transaction Lifecycle: From Initiation to Settlement"
+sidebarTitle: "Transaction Lifecycle"
+description: "Follow a remittance transaction through every stage — from creation and compliance checks to delivery and settlement — in the Fable Fintech platform."
+---
+
+Understanding the transaction lifecycle helps you build better integrations, handle errors gracefully, and keep your customers informed at every step. Every transaction on the Fable platform — whether it is a consumer remittance via DigiRemit, a bulk disbursement via LastMile, or a business payment via BizPay — moves through a defined sequence of states from creation through to final settlement. Knowing what each state means, how long it typically lasts, and what actions you can take at each stage gives you the confidence to build reliable, production-ready payment flows.
+
+## Transaction States
+
+<Steps>
+  <Step title="Transaction Created">
+    A transaction begins when you make an authenticated `POST` request to the `/transactions` endpoint with a valid corridor, channel, currency pair, amount, and recipient. If the request passes validation, the platform creates the transaction record and returns an immediate response containing the core transaction details.
+
+    **Status:** `PENDING`
+
+    The response includes the fields you need to present a confirmation to your customer before funds are collected:
+
+    ```json
+    {
+      "transaction_id": "TXN-20240115-ABC123",
+      "status": "PENDING",
+      "source_amount": 500.00,
+      "source_currency": "USD",
+      "destination_amount": 41625.00,
+      "destination_currency": "INR",
+      "exchange_rate": 83.25,
+      "rate_id": "RATE-20240115-XYZ789",
+      "rate_locked_until": "2024-01-15T10:35:00Z",
+      "corridor": "US-IN",
+      "channel": "BANK_TRANSFER",
+      "created_at": "2024-01-15T10:34:00Z"
+    }
+    ```
+
+    At this point, no funds have been moved. The exchange rate is locked for the duration specified in `rate_locked_until`. If the transaction is not confirmed within that window, you must fetch a new rate before proceeding.
+  </Step>
+
+  <Step title="Compliance Screening">
+    Immediately after creation, the transaction enters automated compliance screening. The platform runs AML checks, sanctions list lookups, and any corridor-specific risk rules against both the sender and recipient in parallel.
+
+    **Status:** `SCREENING`
+
+    For the vast majority of transactions, this stage completes within a few seconds and the transaction advances automatically. You do not need to take any action during screening unless a manual review is triggered.
+
+    If the screening engine flags the transaction — due to a sanctions match, an AML risk indicator, or a compliance rule breach — the status will move to `AWAITING_REVIEW` rather than advancing to the next stage. Your compliance team will be notified to review the flag.
+  </Step>
+
+  <Step title="Approval (If Required)">
+    High-value transactions, first-time recipient transfers, or transactions in elevated-risk corridors may require multi-person approval before processing can begin. This stage applies your configured **4-Eye** (two-person) or **6-Eye** (three-person) workflow, where the required number of authorised users must independently approve the transaction.
+
+    **Status:** `AWAITING_APPROVAL`
+
+    Each approver receives a notification and can review and act on the transaction through the Fable dashboard or via the `/transactions/{id}/approve` API endpoint. The transaction will remain in this state until all required approvals are collected.
+
+    If your integration does not have approval workflows configured, or if the transaction does not meet the threshold that triggers approval, this stage is skipped automatically.
+  </Step>
+
+  <Step title="Processing">
+    Once compliance screening passes and any required approvals are granted, the platform begins collecting funds from the sender. Depending on your funding model, this may involve a debit instruction to a prefunded wallet, a direct debit from the sender's payment method, or a drawdown from your settlement account.
+
+    **Status:** `PROCESSING`
+
+    During this stage, the transaction is committed — it cannot be cancelled. The platform is actively coordinating with the source-side payment network to confirm receipt of funds before dispatching to the delivery network.
+  </Step>
+
+  <Step title="In Transit">
+    With source funds confirmed, the platform dispatches the payment to the destination delivery network — a correspondent bank, a mobile money operator, a cash agent network, or a real-time payment rail such as UPI or NETS.
+
+    **Status:** `IN_TRANSIT`
+
+    The time spent in this state varies by corridor and channel. Real-time rails such as UPI typically settle in seconds; bank transfers in some corridors may take one to two business days. Fable provides estimated delivery times per corridor and channel via the `/corridors/{corridor}/sla` endpoint.
+  </Step>
+
+  <Step title="Delivered">
+    The destination network confirms that funds have been credited to the recipient — either to their bank account, mobile wallet, or made available for cash pickup.
+
+    **Status:** `DELIVERED`
+
+    At this point, your customer can be notified that their transfer is complete. The full delivery confirmation, including any network reference numbers, is available in the transaction record.
+  </Step>
+
+  <Step title="Settled">
+    After delivery is confirmed, the platform performs final reconciliation. Settlement involves matching the delivered amount against the booked FX rate, reconciling fees, and updating your account ledger.
+
+    **Status:** `SETTLED`
+
+    This is a terminal state. The transaction is fully complete, reconciled, and recorded in your settlement report. Settled transactions appear in your daily settlement file, available via the `/reports/settlement` endpoint or the Fable dashboard.
+  </Step>
+</Steps>
+
+## Failed and Cancelled States
+
+Not every transaction reaches `SETTLED`. Two additional terminal states represent transactions that did not complete successfully.
+
+### `FAILED`
+
+A transaction moves to `FAILED` when it cannot be completed due to a compliance rejection (e.g., a hard sanctions match), a payment collection failure (e.g., insufficient funds or a declined card), or a delivery network error that exhausts all retry attempts.
+
+When a transaction fails, the `failure_reason` field in the transaction record contains a machine-readable code and a human-readable description. Any funds already collected are refunded according to your configured refund policy.
+
+```json
+{
+  "transaction_id": "TXN-20240115-ABC123",
+  "status": "FAILED",
+  "failure_reason": {
+    "code": "COMPLIANCE_BLOCK",
+    "message": "Transaction blocked due to sanctions list match on recipient."
+  },
+  "failed_at": "2024-01-15T10:36:45Z"
+}
+```
+
+### `CANCELLED`
+
+A transaction can be cancelled by your system or by the sender before it has entered the `PROCESSING` stage. Once processing begins, cancellation is no longer possible.
+
+To cancel a transaction, issue a `DELETE` or `POST` to the `/transactions/{id}/cancel` endpoint while the transaction is still in `PENDING`, `SCREENING`, or `AWAITING_APPROVAL` status.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $FABLE_API_KEY" \
+  -H "Content-Type: application/json" \
+  https://api.fablefintech.com/v1/transactions/TXN-20240115-ABC123/cancel
+```
+
+## Status Polling
+
+You can check the current status of any transaction at any time by calling the status endpoint with the transaction ID. This is useful for building confirmation screens, support tooling, or lightweight integrations that do not use webhooks.
+
+```bash
+curl -H "Authorization: Bearer $FABLE_API_KEY" \
+  https://api.fablefintech.com/v1/transactions/TXN-20240115-ABC123/status
+```
+
+The response returns the current status along with relevant timestamps:
+
+```json
+{
+  "transaction_id": "TXN-20240115-ABC123",
+  "status": "IN_TRANSIT",
+  "created_at": "2024-01-15T10:34:00Z",
+  "screening_completed_at": "2024-01-15T10:34:03Z",
+  "processing_started_at": "2024-01-15T10:34:10Z",
+  "dispatched_at": "2024-01-15T10:34:22Z",
+  "estimated_delivery": "2024-01-15T10:35:30Z"
+}
+```
+
+<Note>
+  Avoid polling more frequently than once every 5 seconds. For production integrations handling significant transaction volumes, webhooks are strongly preferred over polling to reduce latency and API load.
+</Note>
+
+## Webhooks
+
+Rather than polling for status changes, you can configure webhooks to receive real-time push notifications whenever a transaction's status changes. Fable will send an HTTP `POST` request to your registered endpoint each time a transaction advances to a new state, including `DELIVERED`, `FAILED`, and `SETTLED`.
+
+Webhooks are the recommended approach for production integrations — they are faster, more efficient, and eliminate the risk of missed status transitions between poll intervals.
+
+For full details on configuring webhook endpoints, verifying signatures, and handling retries, see the [Webhooks Guide](/guides/webhooks).
+
+## Status Reference
+
+| Status              | Description                                                               | Terminal |
+|---------------------|---------------------------------------------------------------------------|----------|
+| `PENDING`           | Transaction created; awaiting compliance screening.                       | No       |
+| `SCREENING`         | Automated AML and sanctions checks in progress.                           | No       |
+| `AWAITING_REVIEW`   | Flagged by compliance engine; manual review required.                     | No       |
+| `AWAITING_APPROVAL` | Pending 4-Eye or 6-Eye multi-person approval.                             | No       |
+| `PROCESSING`        | Funds being collected from sender.                                        | No       |
+| `IN_TRANSIT`        | Funds dispatched to destination delivery network.                         | No       |
+| `DELIVERED`         | Funds credited to recipient.                                              | No       |
+| `SETTLED`           | Final reconciliation complete. Transaction closed.                        | Yes      |
+| `FAILED`            | Transaction could not be completed. Funds returned to sender.             | Yes      |
+| `CANCELLED`         | Transaction cancelled before processing began.                            | Yes      |

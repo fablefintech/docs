@@ -1,0 +1,181 @@
+---
+title: "Configure and Handle Fable Fintech Webhooks"
+sidebarTitle: "Webhooks"
+description: "Set up webhooks to receive real-time transaction status updates and compliance events from Fable Fintech instead of polling the API."
+---
+
+Webhooks let Fable push real-time event notifications directly to your server — eliminating the need to repeatedly poll the API for transaction status updates and compliance outcomes. When a relevant event occurs (such as a transaction status change or a KYC verification completing), Fable sends an HTTP POST request to the endpoint URL you register, with a signed JSON payload describing the event. This guide covers registering a webhook endpoint, the full list of supported event types, payload structure, signature verification, and best practices for reliable event processing.
+
+## Registering a Webhook
+
+Call `POST /webhooks` with the URL of your receiving endpoint, the list of event types you want to subscribe to, and a secret string that Fable will use to sign payloads. Store the secret securely — you will need it to verify incoming webhook signatures.
+
+```bash
+curl --request POST \
+  --url "https://api-sandbox.fablefintech.com/v1/webhooks" \
+  --header "Authorization: Bearer <your_api_key>" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "url": "https://your-platform.com/webhooks/fable",
+    "events": ["transaction.status_changed", "transaction.delivered", "compliance.kyc_completed"],
+    "secret": "your_webhook_secret"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "webhook_id": "WH-20240115-001",
+  "url": "https://your-platform.com/webhooks/fable",
+  "events": ["transaction.status_changed", "transaction.delivered", "compliance.kyc_completed"],
+  "status": "ACTIVE",
+  "created_at": "2024-01-15T09:00:00Z"
+}
+```
+
+You can register multiple webhooks with different URLs and event subscriptions — for example, routing compliance events to a separate internal service from transaction events.
+
+## Event Types
+
+Fable supports the following webhook event types. Subscribe only to the events your integration needs to process.
+
+| Event | Description |
+|---|---|
+| `transaction.created` | A new transaction has been initiated |
+| `transaction.status_changed` | The transaction status has changed; payload includes both old and new status |
+| `transaction.delivered` | Funds have been confirmed as delivered to the recipient |
+| `transaction.failed` | The transaction has failed; payload includes the failure reason and code |
+| `transaction.cancelled` | The transaction was cancelled by the sender or your platform |
+| `compliance.kyc_completed` | A KYC verification has finished; payload includes the outcome |
+| `compliance.screening_completed` | An AML or sanctions screening check has finished; payload includes the result |
+
+## Webhook Payload
+
+Each webhook delivery is an HTTP POST to your registered URL with a JSON body. The following example shows the payload for a `transaction.status_changed` event:
+
+```json
+{
+  "event": "transaction.status_changed",
+  "webhook_id": "WH-20240115-001",
+  "transaction_id": "TXN-20240115-ABC123",
+  "old_status": "PROCESSING",
+  "new_status": "IN_TRANSIT",
+  "timestamp": "2024-01-15T11:00:00Z",
+  "metadata": {
+    "corridor": "US-IN",
+    "channel": "BANK_TRANSFER",
+    "amount": 500.00,
+    "source_currency": "USD"
+  }
+}
+```
+
+All payloads include `event`, `webhook_id`, and `timestamp` at the top level. Event-specific fields (such as `transaction_id`, `old_status`, and `new_status`) are included based on the event type.
+
+## Verifying Webhook Signatures
+
+Every webhook delivery includes an `X-Fable-Signature` header containing a HMAC-SHA256 signature of the raw request body, computed using your webhook secret. You must verify this signature on every incoming request before processing the event — this protects your endpoint from forged or tampered payloads.
+
+The signature is computed as:
+
+```
+HMAC-SHA256(secret, raw_request_body) → hex digest
+```
+
+The following example shows signature verification in Node.js:
+
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhook(payload, signature, secret) {
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expected)
+  );
+}
+
+// Express.js middleware example
+app.post('/webhooks/fable', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-fable-signature'];
+  const secret = process.env.FABLE_WEBHOOK_SECRET;
+
+  if (!verifyWebhook(req.body, signature, secret)) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  // Return 200 immediately before processing
+  res.status(200).send('OK');
+
+  // Process the event asynchronously
+  const event = JSON.parse(req.body);
+  processWebhookEvent(event);
+});
+```
+
+Use `crypto.timingSafeEqual` (or its equivalent in your language) rather than a direct string comparison — this prevents timing attacks that could allow an attacker to infer the secret.
+
+## Handling Webhook Events
+
+<Steps>
+  <Step title="Verify the Signature">
+    Before doing anything else, verify the `X-Fable-Signature` header against the raw request body using your webhook secret. Reject any request that fails signature verification with a `401 Unauthorized` response. Never process an event from an unverified payload.
+  </Step>
+
+  <Step title="Return 200 Immediately">
+    Respond with HTTP `200 OK` as quickly as possible — before you parse the payload or begin any processing. Fable considers a webhook delivery successful only when it receives a `200` response within 5 seconds of sending the request.
+
+    <Warning>
+      Failing to return `200` within 5 seconds will cause Fable to treat the delivery as failed and retry it. Retries are sent with exponential backoff. If your processing logic is slow, return `200` first and handle the event asynchronously.
+    </Warning>
+  </Step>
+
+  <Step title="Process the Event Asynchronously">
+    After returning `200`, process the event outside the HTTP request cycle. Push the raw payload onto an internal queue (such as Redis, AWS SQS, or RabbitMQ) and have a separate worker consume and process events. This decouples event ingestion from processing, ensuring that slow downstream operations (database writes, third-party API calls) do not affect your webhook response time.
+
+    <Tip>
+      Using a durable queue (e.g., Redis Streams, AWS SQS) means events are not lost if your processing worker is temporarily unavailable. Events remain in the queue until they are successfully consumed and acknowledged.
+    </Tip>
+  </Step>
+
+  <Step title="Handle Duplicates Idempotently">
+    Fable may deliver the same event more than once — for example, if your server returned a non-`200` response due to a transient error, or if a network timeout prevented the response from reaching Fable's servers. Your event handler must be idempotent: processing the same event multiple times should produce the same result as processing it once.
+
+    Implement deduplication by storing processed `webhook_id` and `event` combinations in a fast lookup store (e.g., a Redis set or a database unique index). Before processing an event, check whether it has already been handled:
+
+    ```javascript
+    async function processWebhookEvent(event) {
+      const deduplicationKey = `${event.webhook_id}:${event.event}:${event.timestamp}`;
+
+      const alreadyProcessed = await redis.get(deduplicationKey);
+      if (alreadyProcessed) {
+        console.log(`Duplicate event skipped: ${deduplicationKey}`);
+        return;
+      }
+
+      // Mark as processed before handling (use a transaction or TTL for safety)
+      await redis.set(deduplicationKey, '1', 'EX', 86400); // TTL: 24 hours
+
+      // Handle the event
+      switch (event.event) {
+        case 'transaction.status_changed':
+          await handleStatusChange(event);
+          break;
+        case 'transaction.delivered':
+          await handleDelivered(event);
+          break;
+        case 'compliance.kyc_completed':
+          await handleKycCompleted(event);
+          break;
+        default:
+          console.log(`Unhandled event type: ${event.event}`);
+      }
+    }
+    ```
+  </Step>
+</Steps>
